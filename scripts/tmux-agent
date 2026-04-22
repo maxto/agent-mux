@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# tmux-bridge — Agent-agnostic CLI for cross-pane communication in tmux.
+# tmux-agent — Agent-agnostic CLI for cross-pane communication in tmux.
 # Any tool that can run bash can use this to talk to other panes.
 set -euo pipefail
 
-VERSION="2.0.1"
+VERSION="1.0.0"
 
 # --- Helpers ---
 
@@ -17,7 +17,7 @@ read_guard_path() {
   local uid
   uid=$(id -u)
   # Sanitize: %66 → _66; include UID to avoid collisions on multi-user systems
-  echo "/tmp/tmux-bridge-read-${uid}-${pane_id//%/_}"
+  echo "/tmp/tmux-agent-read-${uid}-${pane_id//%/_}"
 }
 
 mark_read() {
@@ -28,7 +28,7 @@ require_read() {
   local guard
   guard=$(read_guard_path "$1")
   if [[ ! -f "$guard" ]]; then
-    die "must read the pane before interacting. Run: tmux-bridge read $1"
+    die "must read the pane before interacting. Run: tmux-agent read $1"
   fi
 }
 
@@ -37,15 +37,15 @@ clear_read() {
 }
 
 # Detect the correct tmux server socket.
-# Priority: TMUX_BRIDGE_SOCKET env > $TMUX (if socket alive) > scan for pane owner.
+# Priority: TMUX_AGENT_SOCKET env > $TMUX (if socket alive) > scan for pane owner.
 detect_socket() {
   # Explicit override
-  if [[ -n "${TMUX_BRIDGE_SOCKET:-}" ]]; then
-    if [[ -S "$TMUX_BRIDGE_SOCKET" ]]; then
-      echo "$TMUX_BRIDGE_SOCKET"
+  if [[ -n "${TMUX_AGENT_SOCKET:-}" ]]; then
+    if [[ -S "$TMUX_AGENT_SOCKET" ]]; then
+      echo "$TMUX_AGENT_SOCKET"
       return
     fi
-    die "TMUX_BRIDGE_SOCKET=$TMUX_BRIDGE_SOCKET is not a valid socket"
+    die "TMUX_AGENT_SOCKET=$TMUX_AGENT_SOCKET is not a valid socket"
   fi
 
   # Extract from $TMUX (format: "socket_path,pid,session_index")
@@ -122,9 +122,9 @@ tmx() {
 
 usage() {
   cat <<'EOF'
-tmux-bridge — cross-pane communication for AI agents
+tmux-agent — cross-pane communication for AI agents
 
-Usage: tmux-bridge <command> [args...]
+Usage: tmux-agent <command> [args...]
 
 Commands:
   list                      Show all panes (target, pid, command, size, label)
@@ -141,10 +141,10 @@ Commands:
 
 Target resolution:
   Targets can be tmux native (session:window.pane, %N) or a label set via 'name'.
-  Labels are resolved automatically — e.g. 'tmux-bridge type codex "hello"' works.
+  Labels are resolved automatically — e.g. 'tmux-agent type codex "hello"' works.
 
 Environment:
-  TMUX_BRIDGE_SOCKET   Override the tmux server socket path (skips auto-detection)
+  TMUX_AGENT_SOCKET   Override the tmux server socket path (skips auto-detection)
 EOF
   exit 0
 }
@@ -197,7 +197,7 @@ validate_target() {
 require_args() {
   local need="$1" have="$2" cmd="$3"
   if (( have < need )); then
-    die "'$cmd' requires at least $need argument(s). Run 'tmux-bridge' for usage."
+    die "'$cmd' requires at least $need argument(s). Run 'tmux-agent' for usage."
   fi
 }
 
@@ -259,7 +259,7 @@ cmd_message() {
   local session_win
   session_win=$(tmx display-message -t "$sender_pane" -p '#{session_name}:#{window_index}.#{pane_index}' 2>/dev/null || true)
 
-  local header="[tmux-bridge from:${from} pane:${sender_pane} at:${session_win} - load the agent-mux skill to reply]"
+  local header="[tmux-agent from:${from} pane:${sender_pane} at:${session_win} - load the agent-mux skill to reply]"
   tmx send-keys -t "$target" -l -- "${header} ${*:2}"
   clear_read "$target"
 }
@@ -331,26 +331,26 @@ cmd_doctor() {
   require_tmux
   local ok=true
 
-  echo "tmux-bridge doctor v${VERSION}"
+  echo "tmux-agent doctor v${VERSION}"
   echo "---"
 
   # Environment
-  echo "TMUX_PANE:          ${TMUX_PANE:-<unset>}"
-  echo "TMUX:               ${TMUX:-<unset>}"
-  echo "TMUX_BRIDGE_SOCKET: ${TMUX_BRIDGE_SOCKET:-<unset>}"
+  echo "TMUX_PANE:         ${TMUX_PANE:-<unset>}"
+  echo "TMUX:              ${TMUX:-<unset>}"
+  echo "TMUX_AGENT_SOCKET: ${TMUX_AGENT_SOCKET:-<unset>}"
 
   # Socket from $TMUX
   if [[ -n "${TMUX:-}" ]]; then
     local env_socket="${TMUX%%,*}"
     if [[ -S "$env_socket" ]]; then
       if tmux -S "$env_socket" list-sessions &>/dev/null; then
-        echo "\$TMUX socket:       $env_socket (reachable)"
+        echo "\$TMUX socket:      $env_socket (reachable)"
       else
-        echo "\$TMUX socket:       $env_socket (exists but not responding)"
+        echo "\$TMUX socket:      $env_socket (exists but not responding)"
         ok=false
       fi
     else
-      echo "\$TMUX socket:       $env_socket (MISSING — stale env)"
+      echo "\$TMUX socket:      $env_socket (MISSING — stale env)"
       ok=false
     fi
   fi
@@ -360,12 +360,12 @@ cmd_doctor() {
   local detected
   detected=$(detect_socket 2>/dev/null || echo "__failed__")
   if [[ "$detected" == "__failed__" ]]; then
-    echo "Detected socket:    FAILED — no reachable tmux server found"
+    echo "Detected socket:   FAILED — no reachable tmux server found"
     ok=false
   elif [[ "$detected" == "__default__" ]]; then
-    echo "Detected socket:    (default tmux server)"
+    echo "Detected socket:   (default tmux server)"
   else
-    echo "Detected socket:    $detected"
+    echo "Detected socket:   $detected"
   fi
 
   # Pane visibility
@@ -383,10 +383,10 @@ cmd_doctor() {
   if [[ "$detected" != "__failed__" ]]; then
     local count
     count=$(tmx list-panes -a -F '#{pane_id}' 2>/dev/null | wc -l | tr -d ' ')
-    echo "Total panes:        $count"
+    echo "Total panes:       $count"
     local labeled
     labeled=$(tmx list-panes -a -F '#{@name}' 2>/dev/null | grep -cv '^$' || echo 0)
-    echo "Labeled panes:      $labeled"
+    echo "Labeled panes:     $labeled"
   fi
 
   echo "---"
@@ -396,7 +396,7 @@ cmd_doctor() {
     echo "Status: ISSUES DETECTED"
     echo ""
     echo "Likely cause: \$TMUX env var is stale (terminal was restarted)."
-    echo "Fix: re-source tmux env or set TMUX_BRIDGE_SOCKET explicitly."
+    echo "Fix: re-source tmux env or set TMUX_AGENT_SOCKET explicitly."
     return 1
   fi
 }
@@ -405,11 +405,10 @@ cmd_doctor() {
 
 [[ $# -eq 0 ]] && usage
 
-# cmd_id and cmd_doctor(detect) don't need socket pre-init for the id case
 case "$1" in
   id)      shift; cmd_id "$@"; exit ;;
   -h|--help|help) usage ;;
-  version) echo "tmux-bridge $VERSION"; exit ;;
+  version) echo "tmux-agent $VERSION"; exit ;;
 esac
 
 # All other commands need the socket
@@ -426,5 +425,5 @@ case "$1" in
   name)    shift; cmd_name "$@" ;;
   resolve) shift; cmd_resolve "$@" ;;
   doctor)  shift; cmd_doctor "$@" ;;
-  *)       die "unknown command: $1. Run 'tmux-bridge' for usage." ;;
+  *)       die "unknown command: $1. Run 'tmux-agent' for usage." ;;
 esac

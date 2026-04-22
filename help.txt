@@ -1,4 +1,4 @@
-tmux-bridge
+tmux-agent
 
   list                  show all panes
   send <t> <msg>        send message to pane

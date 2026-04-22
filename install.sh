@@ -2,7 +2,7 @@
 # agent-mux — one-command tmux setup
 set -euo pipefail
 
-VERSION="1.0.2"
+VERSION="1.1.0"
 REPO="maxto/agent-mux"
 BRANCH="main"
 BASE_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
@@ -133,7 +133,7 @@ install_skill() {
   info "Installing agent-mux skill to ${target_dir/#$HOME/\~}..."
   mkdir -p "$target_dir/references"
   download "$BASE_URL/skills/agent-mux/SKILL.md"                         "$target_dir/SKILL.md"
-  download "$BASE_URL/skills/agent-mux/references/tmux-bridge.md"        "$target_dir/references/tmux-bridge.md"
+  download "$BASE_URL/skills/agent-mux/references/tmux-agent.md"        "$target_dir/references/tmux-agent.md"
   download "$BASE_URL/skills/agent-mux/references/tmux.md"               "$target_dir/references/tmux.md"
 }
 
@@ -187,10 +187,10 @@ cmd_install() {
     ln -sf "$SMUX_DIR/tmux.conf" "$TMUX_XDG_DIR/tmux.conf"
   fi
 
-  # 5. Download tmux-bridge
-  info "Downloading tmux-bridge..."
-  download "$BASE_URL/scripts/tmux-bridge" "$BIN_DIR/tmux-bridge"
-  chmod +x "$BIN_DIR/tmux-bridge"
+  # 5. Download tmux-agent
+  info "Downloading tmux-agent..."
+  download "$BASE_URL/scripts/tmux-agent" "$BIN_DIR/tmux-agent"
+  chmod +x "$BIN_DIR/tmux-agent"
 
   # 6. Save agent-mux CLI (download to tmp then mv — avoids self-overwrite if running from PATH)
   info "Installing agent-mux CLI..."
@@ -217,7 +217,7 @@ cmd_install() {
   if [[ "$with_config" == true ]]; then
     echo "  Config:         ~/.agent-mux/tmux.conf"
   fi
-  echo "  tmux-bridge:    ~/.agent-mux/bin/tmux-bridge"
+  echo "  tmux-agent:    ~/.agent-mux/bin/tmux-agent"
   echo "  agent-mux CLI:  ~/.agent-mux/bin/agent-mux"
   echo "  skill:          $skill_rel"
   if [[ "$with_config" != true ]]; then
@@ -238,9 +238,9 @@ cmd_update() {
   mkdir -p "$SMUX_DIR" "$BIN_DIR"
   download "$BASE_URL/help.txt" "$SMUX_DIR/help.txt"
 
-  info "Downloading tmux-bridge..."
-  download "$BASE_URL/scripts/tmux-bridge" "$BIN_DIR/tmux-bridge"
-  chmod +x "$BIN_DIR/tmux-bridge"
+  info "Downloading tmux-agent..."
+  download "$BASE_URL/scripts/tmux-agent" "$BIN_DIR/tmux-agent"
+  chmod +x "$BIN_DIR/tmux-agent"
 
   info "Updating agent-mux CLI..."
   download "$BASE_URL/install.sh" "$BIN_DIR/agent-mux.tmp"
@@ -318,21 +318,21 @@ Usage: agent-mux <command> [flags]
 
 Commands:
   install [--with-config]            Install agent-mux
-    [--project-dir <path>]             Default: installs tmux-bridge, agent-mux CLI, and
+    [--project-dir <path>]             Default: installs tmux-agent, agent-mux CLI, and
                                        the /agent-mux Claude Code skill (to .claude/skills/agent-mux/
                                        in the current directory, or --project-dir if given).
                                        --with-config: also installs the agent-mux tmux config
                                        and symlinks it to ~/.config/tmux/tmux.conf.
                                        Your existing config is backed up to ~/.agent-mux/backups/.
-  update                    Update tmux-bridge, agent-mux CLI, and tmux.conf to latest
+  update                    Update tmux-agent, agent-mux CLI, and tmux.conf to latest
   uninstall                 Remove agent-mux and restore previous tmux config (if backed up)
   version                   Print version
-  help                      Show tmux-bridge and keybinding cheatsheet
+  help                      Show tmux-agent and keybinding cheatsheet
   --help                    Show this CLI reference
 
 Files:
   ~/.agent-mux/tmux.conf              tmux configuration (downloaded by --with-config)
-  ~/.agent-mux/bin/tmux-bridge        cross-pane communication CLI
+  ~/.agent-mux/bin/tmux-agent        cross-pane communication CLI
   ~/.agent-mux/bin/agent-mux          this CLI
   ~/.agent-mux/backups/               config backups (created by --with-config)
   .claude/skills/agent-mux/           Claude Code /agent-mux skill (installed to project dir)

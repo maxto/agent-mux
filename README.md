@@ -3,7 +3,7 @@
 tmux for humans and multi-model AI teams. Works on Linux, macOS, and WSL2 (Windows Terminal).
 
 - **For humans** — tmux without the learning curve: Alt-key navigation, mouse support, and labeled panes. No prefix key, no config expertise required.
-- **For agents** — `tmux-bridge` gives any CLI agent (Claude Code, Codex, aider, Gemini CLI, local models via Ollama, OpenDevin, or any bash-capable tool) a unified way to read, write, and communicate across panes.
+- **For agents** — `tmux-agent` gives any CLI agent (Claude Code, Codex, aider, Gemini CLI, local models via Ollama, OpenDevin, or any bash-capable tool) a unified way to read, write, and communicate across panes.
 - **Multi-model workflows** — run multiple agents in parallel on the same codebase. Collaborative builds, adversarial review, cross-model verification — coordinated through tmux panes.
 
 ## Quickstart
@@ -20,17 +20,17 @@ agent-mux install
 /agent-mux
 ```
 
-Claude now knows how to use `tmux-bridge` to talk to other panes, launch agents, and coordinate work.
+Your coordinator agent now knows how to use `tmux-agent` to talk to other panes, launch agents, and coordinate work.
 
 > **Note:** the first `curl` installs global tools and also copies the skill into whatever directory you're in. Run it from `~` if you don't want the skill installed there, then `cd your-project && agent-mux install`.
 
 ## Example
 
-Three agents, one project. You give Claude one instruction — Claude handles the rest.
+Three agents, one project. One coordinator agent handles everything else.
 
 > "Set up a 3-agent session with Codex and Gemini. Ask each one their role."
 
-Claude sets up the panes, launches the agents, and coordinates via `tmux-bridge`:
+The coordinator sets up the panes, launches the agents, and coordinates via `tmux-agent`:
 
 ```
 [from:codex] Ready. Code review, implementation, bug analysis.
@@ -47,7 +47,7 @@ See [`examples/hello-agents/`](examples/hello-agents/) for the full walkthrough.
 curl -fsSL https://maxto.github.io/agent-mux/install.sh | bash
 ```
 
-Installs `tmux-bridge` and `agent-mux` into `~/.agent-mux/bin/` and adds them to your PATH. Also installs tmux if missing. Your existing tmux config is **not touched**.
+Installs `tmux-agent` and `agent-mux` into `~/.agent-mux/bin/` and adds them to your PATH. Also installs tmux if missing. Your existing tmux config is **not touched**.
 
 > The installer modifies your shell rc file (`~/.bashrc` or `~/.zshrc`) to add `~/.agent-mux/bin` to PATH, and may install tmux or xclip via your package manager if they are missing.
 
@@ -58,9 +58,9 @@ cd your-project
 agent-mux install
 ```
 
-Copies the `/agent-mux` skill into `.claude/skills/agent-mux/`. This teaches AI agents (Claude Code, Codex, Gemini CLI, etc.) how to use `tmux-bridge` — without it, they don't know the tool exists. In Claude Code, invoke it with `/agent-mux`.
+Copies the `/agent-mux` skill into `.claude/skills/agent-mux/`. This teaches AI agents (Claude Code, Codex, Gemini CLI, etc.) how to use `tmux-agent` — without it, they don't know the tool exists. In Claude Code, invoke it with `/agent-mux`.
 
-> `agent-mux install` also re-downloads the global binaries (`tmux-bridge`, `agent-mux`) — it is safe to run multiple times. If you already ran the `curl` command in your project directory, running `agent-mux install` again is still safe but the skill will simply be refreshed.
+> `agent-mux install` also re-downloads the global binaries (`tmux-agent`, `agent-mux`) — it is safe to run multiple times. If you already ran the `curl` command in your project directory, running `agent-mux install` again is still safe but the skill will simply be refreshed.
 
 ### tmux config (optional)
 
@@ -74,19 +74,19 @@ Installs the agent-mux tmux config: Alt-key navigation, mouse clipboard, labeled
 
 | Command | Description |
 |---|---|
-| `agent-mux install` | Install tmux-bridge, agent-mux CLI, and the `/agent-mux` skill into `$PWD` |
+| `agent-mux install` | Install tmux-agent, agent-mux CLI, and the `/agent-mux` skill into `$PWD` |
 | `agent-mux install --with-config` | Also install the tmux config, symlinked to `~/.config/tmux/tmux.conf` (existing config backed up to `~/.agent-mux/backups/`) |
 | `agent-mux install --project-dir <path>` | Install the `/agent-mux` skill into `<path>/.claude/skills/agent-mux/` instead of `$PWD` |
-| `agent-mux update` | Re-download tmux-bridge and agent-mux CLI; refreshes tmux config only if `--with-config` was previously used; refreshes skill if present in `$PWD` |
+| `agent-mux update` | Re-download tmux-agent and agent-mux CLI; refreshes tmux config only if `--with-config` was previously used; refreshes skill if present in `$PWD` |
 | `agent-mux uninstall` | Remove `~/.agent-mux/`, restore previous tmux config from backup (if available). Note: does not remove the `PATH` line added to your shell rc file. |
 | `agent-mux version` | Print version |
-| `agent-mux help` | Show tmux-bridge and keybinding cheatsheet |
+| `agent-mux help` | Show tmux-agent and keybinding cheatsheet |
 
 ### Files
 
 | Path | Description |
 |---|---|
-| `~/.agent-mux/bin/tmux-bridge` | Cross-pane communication CLI |
+| `~/.agent-mux/bin/tmux-agent` | Cross-pane communication CLI |
 | `~/.agent-mux/bin/agent-mux` | agent-mux CLI |
 | `~/.agent-mux/tmux.conf` | tmux config (downloaded by `--with-config`) |
 | `~/.agent-mux/backups/` | Config backups (created by `--with-config`) |
@@ -141,50 +141,50 @@ Scroll wheel also enters scroll mode automatically.
 - Shift+right-click — paste via context menu (verified paste)
 - Scroll wheel enters scroll mode
 
-## tmux-bridge
+## tmux-agent
 
 A CLI for cross-pane communication. Any tool that can run bash can use it — Claude Code, Codex, Gemini CLI, or a plain shell script.
 
 ```
-claude  ──send──▶  tmux-bridge  ──▶  codex pane
-codex   ──send──▶  tmux-bridge  ──▶  claude pane
+claude  ──send──▶  tmux-agent  ──▶  codex pane
+codex   ──send──▶  tmux-agent  ──▶  claude pane
 ```
 
 ### Reliability: the read guard
 
-`tmux-bridge` enforces a read-before-act protocol: an agent must call `read` before `type` or `keys`. This prevents agents from typing into stale or unexpected pane state — a common failure mode in unguarded tmux automation. `send` handles the full cycle automatically.
+`tmux-agent` enforces a read-before-act protocol: an agent must call `read` before `type` or `keys`. This prevents agents from typing into stale or unexpected pane state — a common failure mode in unguarded tmux automation. `send` handles the full cycle automatically.
 
 ### Command reference
 
 | Command | Description | Example |
 |---|---|---|
-| `tmux-bridge list` | Show all panes with target, session:window, size, process, label, CWD | `tmux-bridge list` |
-| `tmux-bridge read <target> [lines]` | Read last N lines from a pane (default: 50) | `tmux-bridge read codex 20` |
-| `tmux-bridge type <target> <text>` | Type text into a pane without pressing Enter | `tmux-bridge type claude "review src/auth.ts"` |
-| `tmux-bridge keys <target> <key>...` | Send special keys | `tmux-bridge keys codex Enter` |
-| `tmux-bridge send <target> <text>` | Read → message → verify → Enter in one step | `tmux-bridge send codex "what is 2+2"` |
-| `tmux-bridge name <target> <label>` | Label a pane for easy addressing | `tmux-bridge name %1 claude` |
-| `tmux-bridge resolve <label>` | Look up a pane target by label | `tmux-bridge resolve claude` → `%1` |
-| `tmux-bridge id` | Print this pane's ID | `tmux-bridge id` → `%3` |
-| `tmux-bridge message <target> <text>` | Type text with auto-prepended sender info (no Enter) | `tmux-bridge message codex "ping from claude"` |
-| `tmux-bridge doctor` | Diagnose tmux connectivity issues | `tmux-bridge doctor` |
-| `tmux-bridge version` | Print version | `tmux-bridge version` |
+| `tmux-agent list` | Show all panes with target, session:window, size, process, label, CWD | `tmux-agent list` |
+| `tmux-agent read <target> [lines]` | Read last N lines from a pane (default: 50) | `tmux-agent read codex 20` |
+| `tmux-agent type <target> <text>` | Type text into a pane without pressing Enter | `tmux-agent type claude "review src/auth.ts"` |
+| `tmux-agent keys <target> <key>...` | Send special keys | `tmux-agent keys codex Enter` |
+| `tmux-agent send <target> <text>` | Read → message → verify → Enter in one step | `tmux-agent send codex "what is 2+2"` |
+| `tmux-agent name <target> <label>` | Label a pane for easy addressing | `tmux-agent name %1 claude` |
+| `tmux-agent resolve <label>` | Look up a pane target by label | `tmux-agent resolve claude` → `%1` |
+| `tmux-agent id` | Print this pane's ID | `tmux-agent id` → `%3` |
+| `tmux-agent message <target> <text>` | Type text with auto-prepended sender info (no Enter) | `tmux-agent message codex "ping from claude"` |
+| `tmux-agent doctor` | Diagnose tmux connectivity issues | `tmux-agent doctor` |
+| `tmux-agent version` | Print version | `tmux-agent version` |
 
 ### Target resolution
 
 Targets can be tmux native (`session:window.pane`, `%N`) or a label set via `name`. Labels are resolved automatically:
 
 ```bash
-tmux-bridge name %1 claude
-tmux-bridge name %2 codex
-tmux-bridge send codex "ping from claude"
+tmux-agent name %1 claude
+tmux-agent name %2 codex
+tmux-agent send codex "ping from claude"
 ```
 
 ### Environment
 
 | Variable | Description |
 |---|---|
-| `TMUX_BRIDGE_SOCKET` | Override the tmux server socket path (skips auto-detection) |
+| `TMUX_AGENT_SOCKET` | Override the tmux server socket path (skips auto-detection) |
 
 ### Useful tmux commands
 
@@ -200,9 +200,9 @@ See the [agent-mux skill](skills/agent-mux/SKILL.md) for full documentation on a
 
 ## AI Agent Skills
 
-A **skill** is a markdown file loaded into an agent's context that explains how to use a tool — in this case, how to use `tmux-bridge` to read panes, send messages, and coordinate with other agents.
+A **skill** is a markdown file loaded into an agent's context that explains how to use a tool — in this case, how to use `tmux-agent` to read panes, send messages, and coordinate with other agents.
 
-`agent-mux install` automatically copies the skill into `.claude/skills/agent-mux/` in your current project. In Claude Code, invoke it with `/agent-mux` to load the full tmux-bridge documentation into context.
+`agent-mux install` automatically copies the skill into `.claude/skills/agent-mux/` in your current project. In Claude Code, invoke it with `/agent-mux` to load the full tmux-agent documentation into context.
 
 agent-mux works with any agent that can run bash. How each agent loads the skill:
 
