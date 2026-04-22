@@ -1,7 +1,6 @@
 MIT License
 
 Copyright (c) 2026 Max Todaro
-Copyright (c) 2026 shawn pana (original smux)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -20,3 +19,9 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+This project was inspired by and initially based on smux by Shawn Pana
+(https://github.com/ShawnPana/smux), used as a structural starting point.
+The codebase has since been substantially rewritten and extended.
