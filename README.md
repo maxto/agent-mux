@@ -9,10 +9,10 @@ agent-mux is tmux for people and AI agents working in the same terminal.
 ## Quickstart
 
 ```bash
-# 1. Install once per machine
+# 1. Install global tools — once per machine
 curl -fsSL https://maxto.github.io/agent-mux/install.sh | bash
 
-# 2. Install the /agent-mux skill into your project (once per project)
+# 2. Install the skill — once per project
 cd your-project
 agent-mux install
 
@@ -21,8 +21,6 @@ agent-mux install
 ```
 
 Your coordinator agent now knows how to use `tmux-agent` to talk to other panes, launch agents, and coordinate work.
-
-> **Note:** the first `curl` installs global tools and also copies the skill into whatever directory you're in. Run it from `~` if you don't want the skill installed there, then `cd your-project && agent-mux install`.
 
 ## Example
 
@@ -95,7 +93,7 @@ Installs the agent-mux tmux config: Alt-key navigation, mouse clipboard, labeled
 
 ## Controls
 
-> Requires `agent-mux install --with-config`. All shortcuts use **Alt** on Linux/WSL2, **Option** on macOS — no prefix key.
+> Requires `agent-mux install --with-config`. All shortcuts use **Alt** on Linux/Win-WSL2, **Option** on macOS — no prefix key.
 
 
   | Type | Key | Action |
@@ -120,7 +118,7 @@ Installs the agent-mux tmux config: Alt-key navigation, mouse clipboard, labeled
 
 ### Mouse
 
-> Requires `agent-mux install --with-config`. Verified on Windows 11 + WSL2 + Windows Terminal.
+> Requires `agent-mux install --with-config`. Verified on Windows 11 + Win-WSL2 + Windows Terminal.
 
 | Action | Result |
 |---|---|
@@ -220,7 +218,7 @@ Works with Claude Code, Codex, Cursor, Copilot, and [45+ other agents](https://g
 
 ## Requirements
 
-- Linux, WSL2 (Windows Subsystem for Linux), or macOS (requires [Homebrew](https://brew.sh))
+- Linux, Win-WSL2 (Windows Subsystem for Linux), or macOS (requires [Homebrew](https://brew.sh))
 - tmux 3.2+ — installed automatically by `agent-mux install` if missing
 - bash
 - curl or wget (for install)

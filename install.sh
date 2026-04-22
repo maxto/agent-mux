@@ -2,7 +2,7 @@
 # agent-mux — one-command tmux setup
 set -euo pipefail
 
-VERSION="1.1.5"
+VERSION="1.2.0"
 REPO="maxto/agent-mux"
 BRANCH="main"
 BASE_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
@@ -147,19 +147,7 @@ install_skill() {
   download "$BASE_URL/skills/agent-mux/references/tmux.md"          "$claude_dir/references/tmux.md"
 }
 
-cmd_install() {
-  local with_config=false
-  local project_dir="$PWD"
-  local args=("$@")
-  local i=0
-  while [[ $i -lt ${#args[@]} ]]; do
-    case "${args[$i]}" in
-      --with-config) with_config=true ;;
-      --project-dir) i=$(( i + 1 )); project_dir="${args[$i]}" ;;
-    esac
-    i=$(( i + 1 ))
-  done
-
+cmd_global_install() {
   local os
   os=$(detect_os)
   info "Installing agent-mux ($os)..."
@@ -182,66 +170,86 @@ cmd_install() {
     fi
   fi
 
-  # 3. Create directories
+  # 3. Create directories and download help
   mkdir -p "$SMUX_DIR" "$BIN_DIR"
   download "$BASE_URL/help.txt" "$SMUX_DIR/help.txt"
 
-  # 4. Download and symlink tmux config (opt-in only)
-  if [[ "$with_config" == true ]]; then
-    warn "Your existing tmux config will be replaced with a symlink to ~/.agent-mux/tmux.conf"
-    warn "Backups are stored in ~/.agent-mux/backups/"
-    backup_existing
-    info "Downloading tmux.conf..."
-    download "$BASE_URL/.tmux.conf" "$SMUX_DIR/tmux.conf"
-    mkdir -p "$TMUX_XDG_DIR"
-    ln -sf "$SMUX_DIR/tmux.conf" "$TMUX_XDG_DIR/tmux.conf"
-  fi
-
-  # 5. Download tmux-agent
+  # 4. Download tmux-agent
   info "Downloading tmux-agent..."
   download "$BASE_URL/scripts/tmux-agent" "$BIN_DIR/tmux-agent"
   chmod +x "$BIN_DIR/tmux-agent"
 
-  # 6. Save agent-mux CLI (download to tmp then mv — avoids self-overwrite if running from PATH)
+  # 5. Save agent-mux CLI (download to tmp then mv — avoids self-overwrite if running from PATH)
   info "Installing agent-mux CLI..."
   download "$BASE_URL/install.sh" "$BIN_DIR/agent-mux.tmp"
   mv "$BIN_DIR/agent-mux.tmp" "$BIN_DIR/agent-mux"
   chmod +x "$BIN_DIR/agent-mux"
 
-  # 7. Install skill (neutral + Claude Code paths)
-  install_skill "$project_dir"
-
-  # 8. Ensure PATH
+  # 6. Ensure PATH
   ensure_path
 
-  # 9. Reload tmux config if running and config was installed
-  if [[ "$with_config" == true ]] && tmux list-sessions &>/dev/null; then
-    tmux source-file "$SMUX_DIR/tmux.conf" 2>/dev/null && info "Reloaded tmux config." || true
-  fi
-
-  # 10. Done
-  local neutral_rel="${project_dir/#$HOME/\~}/skills/agent-mux"
-  local claude_rel="${project_dir/#$HOME/\~}/.claude/skills/agent-mux"
   echo ""
   printf "${GREEN}${BOLD}agent-mux installed!${NC}\n"
   echo ""
-  if [[ "$with_config" == true ]]; then
-    echo "  Config:         ~/.agent-mux/tmux.conf"
-  fi
   echo "  tmux-agent:     ~/.agent-mux/bin/tmux-agent"
   echo "  agent-mux CLI:  ~/.agent-mux/bin/agent-mux"
-  echo "  skill (neutral):  $neutral_rel"
-  echo "  skill (claude):   $claude_rel"
-  if [[ "$with_config" != true ]]; then
-    echo ""
-    echo "  Tip: run 'agent-mux install --with-config' to also install the tmux config."
-  fi
   echo ""
-  echo "  Run 'agent-mux help' for commands."
+  echo "  Next: cd your-project && agent-mux install"
+  echo "  Then: agent-mux help"
   if ! echo "$PATH" | tr ':' '\n' | grep -qx "$BIN_DIR"; then
     echo ""
     warn "Restart your shell or run: export PATH=\"\$HOME/.agent-mux/bin:\$PATH\""
   fi
+}
+
+cmd_install() {
+  local with_config=false
+  local project_dir="$PWD"
+  local args=("$@")
+  local i=0
+  while [[ $i -lt ${#args[@]} ]]; do
+    case "${args[$i]}" in
+      --with-config) with_config=true ;;
+      --project-dir) i=$(( i + 1 )); project_dir="${args[$i]}" ;;
+    esac
+    i=$(( i + 1 ))
+  done
+
+  info "Installing agent-mux skill into ${project_dir/#$HOME/\~}..."
+
+  # 1. Install skill (neutral + Claude Code paths)
+  install_skill "$project_dir"
+
+  # 2. Download and symlink tmux config (opt-in only)
+  if [[ "$with_config" == true ]]; then
+    warn "Your existing tmux config will be replaced with a symlink to ~/.agent-mux/tmux.conf"
+    warn "Backups are stored in ~/.agent-mux/backups/"
+    mkdir -p "$SMUX_DIR" "$BIN_DIR" "$BACKUP_DIR"
+    backup_existing
+    info "Downloading tmux.conf..."
+    download "$BASE_URL/.tmux.conf" "$SMUX_DIR/tmux.conf"
+    mkdir -p "$TMUX_XDG_DIR"
+    ln -sf "$SMUX_DIR/tmux.conf" "$TMUX_XDG_DIR/tmux.conf"
+    if tmux list-sessions &>/dev/null; then
+      tmux source-file "$SMUX_DIR/tmux.conf" 2>/dev/null && info "Reloaded tmux config." || true
+    fi
+  fi
+
+  local neutral_rel="${project_dir/#$HOME/\~}/skills/agent-mux"
+  local claude_rel="${project_dir/#$HOME/\~}/.claude/skills/agent-mux"
+  echo ""
+  printf "${GREEN}${BOLD}agent-mux skill installed!${NC}\n"
+  echo ""
+  echo "  skill (neutral):  $neutral_rel"
+  echo "  skill (claude):   $claude_rel"
+  if [[ "$with_config" == true ]]; then
+    echo "  Config:           ~/.agent-mux/tmux.conf"
+  else
+    echo ""
+    echo "  Tip: run 'agent-mux install --with-config' to also install the tmux config."
+  fi
+  echo ""
+  echo "  In Claude Code: /agent-mux"
 }
 
 cmd_update() {
@@ -329,9 +337,8 @@ agent-mux — one-command tmux setup
 Usage: agent-mux <command> [flags]
 
 Commands:
-  install [--with-config]            Install agent-mux
-    [--project-dir <path>]             Installs tmux-agent, agent-mux CLI, and the skill
-                                       into two paths in the current dir (or --project-dir):
+  install [--with-config]            Install the agent-mux skill into the current project
+    [--project-dir <path>]             Installs skill into two paths (current dir or --project-dir):
                                          skills/agent-mux/        neutral — any agent
                                          .claude/skills/agent-mux/ Claude Code /agent-mux
                                        --with-config: also installs the agent-mux tmux config
@@ -362,7 +369,7 @@ _default_cmd() {
   if [[ -d "$HOME/.agent-mux" && -x "$HOME/.agent-mux/bin/agent-mux" ]]; then
     cmd_cli_ref
   else
-    cmd_install "$@"
+    cmd_global_install
   fi
 }
 
