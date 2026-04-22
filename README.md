@@ -98,7 +98,7 @@ Installs the agent-mux tmux config: Alt-key navigation, mouse clipboard, labeled
 > Requires `agent-mux install --with-config`. All shortcuts use **Alt** on Linux/WSL2, **Option** on macOS — no prefix key.
 
 <table>
-<tr>
+
 <td valign="top">
 
 | Type | Key | Action |
@@ -128,7 +128,7 @@ Installs the agent-mux tmux config: Alt-key navigation, mouse clipboard, labeled
 | Scroll | scroll wheel | Enter scroll mode automatically |
 
 </td>
-</tr>
+
 </table>
 
 ### Mouse
