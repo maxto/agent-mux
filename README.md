@@ -128,41 +128,82 @@ Installs the agent-mux tmux config: Alt-key navigation, mouse clipboard, labeled
 
 ## tmux-agent
 
-A CLI for cross-pane communication. Any tool that can run bash can use it — Claude Code, Codex, Gemini CLI, or a plain shell script.
+A CLI to send text to any tmux pane — without copy-paste. Works from your shell or from an AI agent.
 
-```
-claude  ──send──▶  tmux-agent  ──▶  codex pane
-codex   ──send──▶  tmux-agent  ──▶  claude pane
-```
+### Commands
 
-### Reliability: the read guard
+| Command | Description |
+|---|---|
+| `tmux-agent list` | Show all panes (ID, process, label) |
+| `tmux-agent name <target> <label>` | Give a pane a readable name |
+| `tmux-agent read <target> [lines]` | Read last N lines from a pane (default: 50) |
+| `tmux-agent send <target> <text>` | Send a message — full cycle: read → type → verify → Enter |
+| `tmux-agent type <target> <text>` | Type text into a pane without pressing Enter |
+| `tmux-agent keys <target> <key>` | Send a special key (Enter, Escape, C-c…) |
+| `tmux-agent message <target> <text>` | Like `type`, but prepends sender info automatically (no Enter) |
+| `tmux-agent resolve <label>` | Get the pane ID for a label |
+| `tmux-agent id` | Print your own pane ID |
+| `tmux-agent doctor` | Check tmux connectivity |
+| `tmux-agent version` | Print version |
 
-`tmux-agent` enforces a read-before-act protocol: an agent must call `read` before `type` or `keys`. This prevents agents from typing into stale or unexpected pane state — a common failure mode in unguarded tmux automation. `send` handles the full cycle automatically.
+### Targets
 
-### Command reference
+A target identifies a pane. Three formats work:
 
-| Command | Description | Example |
-|---|---|---|
-| `tmux-agent list` | Show all panes with target, session:window, size, process, label, CWD | `tmux-agent list` |
-| `tmux-agent read <target> [lines]` | Read last N lines from a pane (default: 50) | `tmux-agent read codex 20` |
-| `tmux-agent type <target> <text>` | Type text into a pane without pressing Enter | `tmux-agent type claude "review src/auth.ts"` |
-| `tmux-agent keys <target> <key>...` | Send special keys | `tmux-agent keys codex Enter` |
-| `tmux-agent send <target> <text>` | Read → message → verify → Enter in one step | `tmux-agent send codex "what is 2+2"` |
-| `tmux-agent name <target> <label>` | Label a pane for easy addressing | `tmux-agent name %1 claude` |
-| `tmux-agent resolve <label>` | Look up a pane target by label | `tmux-agent resolve claude` → `%1` |
-| `tmux-agent id` | Print this pane's ID | `tmux-agent id` → `%3` |
-| `tmux-agent message <target> <text>` | Type text with auto-prepended sender info (no Enter) | `tmux-agent message codex "ping from claude"` |
-| `tmux-agent doctor` | Diagnose tmux connectivity issues | `tmux-agent doctor` |
-| `tmux-agent version` | Print version | `tmux-agent version` |
+- **Label** — a name you set: `codex`, `worker`
+- **Pane ID** — tmux native: `%3`
+- **Full address** — `session:window.pane`: `agents:0.1`
 
-### Target resolution
-
-Targets can be tmux native (`session:window.pane`, `%N`) or a label set via `name`. Labels are resolved automatically:
+Name a pane once, use the label everywhere:
 
 ```bash
-tmux-agent name %1 claude
-tmux-agent name %2 codex
-tmux-agent send codex "ping from claude"
+tmux-agent name %1 codex
+tmux-agent send codex "hello"
+```
+
+### The read guard
+
+You must read a pane before you can type into it. This prevents typing into a stale or unexpected state.
+
+`send` handles this automatically. For manual control:
+
+```bash
+tmux-agent read codex        # 1. read (required before typing)
+tmux-agent type codex "y"    # 2. type without Enter
+tmux-agent read codex        # 3. verify it landed
+tmux-agent keys codex Enter  # 4. press Enter
+```
+
+### Examples
+
+**Step 1 — see what's open:**
+```bash
+tmux-agent list
+```
+
+**Step 2 — name your panes:**
+```bash
+tmux-agent name %1 codex
+tmux-agent name %2 worker
+```
+
+**Send a message to another pane:**
+```bash
+tmux-agent send codex "please review src/auth.ts"
+```
+
+**Read what's in a pane:**
+```bash
+tmux-agent read worker        # last 50 lines
+tmux-agent read worker 10     # last 10 lines
+```
+
+**Approve a yes/no prompt in another pane:**
+```bash
+tmux-agent read worker        # see the prompt
+tmux-agent type worker "y"
+tmux-agent read worker        # verify "y" appeared
+tmux-agent keys worker Enter
 ```
 
 ### Environment
@@ -173,13 +214,12 @@ tmux-agent send codex "ping from claude"
 
 ### Useful tmux commands
 
-| Command | Description | Example |
-|---|---|---|
-| `tmux attach -t <session>` | Reattach to an existing session | `tmux attach -t agents` |
-| `tmux switch-client -t <session>` | Switch to a session from inside tmux | `tmux switch-client -t agents` |
-| `tmux list-sessions` | List all active sessions | `tmux list-sessions` |
-| `tmux new-session -s <name>` | Create a new named session | `tmux new-session -s agents` |
-| `tmux kill-session -t <name>` | Kill a session | `tmux kill-session -t agents` |
+| Command | Description |
+|---|---|
+| `tmux new-session -s agents` | Create a new session named `agents` |
+| `tmux attach -t agents` | Reattach to session `agents` |
+| `tmux list-sessions` | List all active sessions |
+| `tmux kill-session -t agents` | Kill session `agents` |
 
 See the [agent-mux skill](skills/agent-mux/SKILL.md) for full documentation on agent-to-agent workflows.
 
