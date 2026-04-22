@@ -1,0 +1,37 @@
+tmux-bridge
+
+  list                  show all panes
+  send <t> <msg>        send message to pane
+  read <t> [n]          read N lines from pane
+  type <t> <text>       type text (no Enter)
+  keys <t> <key>        send special keys
+  name <t> <label>      label a pane
+  id                    print this pane ID
+  doctor                diagnose connectivity
+
+pane navigation
+
+  Alt+i/k/j/l           up / down / left / right
+  Alt+n                 new pane
+  Alt+w                 close pane
+  Alt+o                 cycle layouts
+  Alt+g / Alt+y         mark / swap
+
+windows
+
+  Alt+m                 new window
+  Alt+u / Alt+h         next / prev window
+
+scroll
+
+  Alt+Tab               toggle scroll mode
+  i / k                 scroll 2 lines
+  I / K                 half page
+  q or Esc              exit scroll mode
+
+clipboard (WSL2)
+
+  drag to select        copy to Windows clipboard
+  right-click           paste (Windows Terminal native)
+  Shift+right-click     paste via context menu
+

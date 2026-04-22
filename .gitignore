@@ -1,0 +1,12 @@
+.DS_Store
+*.swp
+*.swo
+*~
+.env
+
+# Personal config (machine-specific)
+claude-settings.json
+scripts/claude-pane-alert.sh
+
+# Local AI memory (not for version control)
+.claude/memory/
