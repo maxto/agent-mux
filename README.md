@@ -58,8 +58,6 @@ agent-mux install
 
 Installs the skill into two paths: `skills/agent-mux/` (neutral, any agent) and `.claude/skills/agent-mux/` (Claude Code `/agent-mux` slash command). This teaches any AI agent how to use `tmux-agent` — without it, they don't know the tool exists.
 
-> `agent-mux install` also re-downloads the global binaries (`tmux-agent`, `agent-mux`) — safe to run multiple times.
-
 ### tmux config (optional)
 
 ```bash
@@ -72,9 +70,9 @@ Installs the agent-mux tmux config: Alt-key navigation, mouse clipboard, labeled
 
 | Command | Description |
 |---|---|
-| `agent-mux install` | Install tmux-agent, agent-mux CLI, and the `/agent-mux` skill into `$PWD` |
+| `agent-mux install` | Install the `/agent-mux` skill into `$PWD` (neutral + Claude Code paths) |
 | `agent-mux install --with-config` | Also install the tmux config, symlinked to `~/.config/tmux/tmux.conf` (existing config backed up to `~/.agent-mux/backups/`) |
-| `agent-mux install --project-dir <path>` | Install the `/agent-mux` skill into `<path>/.claude/skills/agent-mux/` instead of `$PWD` |
+| `agent-mux install --project-dir <path>` | Install the skill into `<path>` instead of `$PWD` |
 | `agent-mux update` | Re-download tmux-agent and agent-mux CLI; refreshes tmux config only if `--with-config` was previously used; refreshes skill if present in `$PWD` |
 | `agent-mux uninstall` | Remove `~/.agent-mux/`, restore previous tmux config from backup (if available). Note: does not remove the `PATH` line added to your shell rc file. |
 | `agent-mux version` | Print version |
