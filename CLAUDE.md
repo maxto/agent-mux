@@ -13,7 +13,7 @@ Project memory lives in `.claude/memory/` (gitignored). Read `MEMORY.md` there f
 1. `.tmux.conf` — opinionated tmux config with Option-key bindings
 2. `scripts/tmux-agent` — bash CLI for reading/writing across tmux panes
 3. `install.sh` — curl-installable setup script
-4. `skills/agent-mux/SKILL.md` — agent integration documentation
+4. `skills/agent-mux/SKILL.md` — agent integration documentation (installed to both `skills/` and `.claude/skills/`)
 
 ## Installation & Update
 

@@ -58,9 +58,9 @@ cd your-project
 agent-mux install
 ```
 
-Copies the `/agent-mux` skill into `.claude/skills/agent-mux/`. This teaches AI agents (Claude Code, Codex, Gemini CLI, etc.) how to use `tmux-agent` — without it, they don't know the tool exists. In Claude Code, invoke it with `/agent-mux`.
+Installs the skill into two paths: `skills/agent-mux/` (neutral, any agent) and `.claude/skills/agent-mux/` (Claude Code `/agent-mux` slash command). This teaches any AI agent how to use `tmux-agent` — without it, they don't know the tool exists.
 
-> `agent-mux install` also re-downloads the global binaries (`tmux-agent`, `agent-mux`) — it is safe to run multiple times. If you already ran the `curl` command in your project directory, running `agent-mux install` again is still safe but the skill will simply be refreshed.
+> `agent-mux install` also re-downloads the global binaries (`tmux-agent`, `agent-mux`) — safe to run multiple times.
 
 ### tmux config (optional)
 
@@ -90,7 +90,8 @@ Installs the agent-mux tmux config: Alt-key navigation, mouse clipboard, labeled
 | `~/.agent-mux/bin/agent-mux` | agent-mux CLI |
 | `~/.agent-mux/tmux.conf` | tmux config (downloaded by `--with-config`) |
 | `~/.agent-mux/backups/` | Config backups (created by `--with-config`) |
-| `.claude/skills/agent-mux/` | Claude Code `/agent-mux` skill (installed to project dir) |
+| `skills/agent-mux/` | Skill — neutral path (Codex, Gemini, aider, any agent) |
+| `.claude/skills/agent-mux/` | Skill — Claude Code `/agent-mux` slash command |
 
 ## Keybindings
 
@@ -204,15 +205,20 @@ A **skill** is a markdown file loaded into an agent's context that explains how 
 
 `agent-mux install` automatically copies the skill into `.claude/skills/agent-mux/` in your current project. In Claude Code, invoke it with `/agent-mux` to load the full tmux-agent documentation into context.
 
-agent-mux works with any agent that can run bash. How each agent loads the skill:
+agent-mux works with any agent that can run bash. `agent-mux install` copies the skill to two paths:
+
+- **`skills/agent-mux/`** — neutral path, readable by any agent
+- **`.claude/skills/agent-mux/`** — Claude Code slash command support
+
+How each agent loads the skill:
 
 | Agent | How to load the skill |
 |---|---|
-| Claude Code | `/agent-mux` (after `agent-mux install` in your project) |
-| Codex | `/init` — reads `.claude/skills/agent-mux/SKILL.md` automatically |
-| Gemini CLI | `@.claude/skills/agent-mux/SKILL.md` or include in context |
-| aider | `/add .claude/skills/agent-mux/SKILL.md` |
-| Ollama / local models | Paste or include `SKILL.md` in your system prompt |
+| Claude Code | `/agent-mux` slash command |
+| Codex | `/init` — reads `skills/agent-mux/SKILL.md` automatically |
+| Gemini CLI | `@skills/agent-mux/SKILL.md` |
+| aider | `/add skills/agent-mux/SKILL.md` |
+| Ollama / local models | Paste or include `skills/agent-mux/SKILL.md` in system prompt |
 | Other agents | Any agent that can read a file or accept a system prompt works |
 
 For agents that support skills.sh, install via:

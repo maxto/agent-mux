@@ -2,7 +2,7 @@
 # agent-mux — one-command tmux setup
 set -euo pipefail
 
-VERSION="1.1.0"
+VERSION="1.1.1"
 REPO="maxto/agent-mux"
 BRANCH="main"
 BASE_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
@@ -129,12 +129,22 @@ download() {
 
 install_skill() {
   local project_dir="$1"
-  local target_dir="$project_dir/.claude/skills/agent-mux"
-  info "Installing agent-mux skill to ${target_dir/#$HOME/\~}..."
-  mkdir -p "$target_dir/references"
-  download "$BASE_URL/skills/agent-mux/SKILL.md"                         "$target_dir/SKILL.md"
-  download "$BASE_URL/skills/agent-mux/references/tmux-agent.md"        "$target_dir/references/tmux-agent.md"
-  download "$BASE_URL/skills/agent-mux/references/tmux.md"               "$target_dir/references/tmux.md"
+
+  # Neutral path — readable by any agent (Codex /init, Gemini @path, aider /add, etc.)
+  local neutral_dir="$project_dir/skills/agent-mux"
+  info "Installing agent-mux skill to ${neutral_dir/#$HOME/\~}..."
+  mkdir -p "$neutral_dir/references"
+  download "$BASE_URL/skills/agent-mux/SKILL.md"                    "$neutral_dir/SKILL.md"
+  download "$BASE_URL/skills/agent-mux/references/tmux-agent.md"   "$neutral_dir/references/tmux-agent.md"
+  download "$BASE_URL/skills/agent-mux/references/tmux.md"          "$neutral_dir/references/tmux.md"
+
+  # Claude Code path — enables /agent-mux slash command
+  local claude_dir="$project_dir/.claude/skills/agent-mux"
+  info "Installing Claude Code skill to ${claude_dir/#$HOME/\~}..."
+  mkdir -p "$claude_dir/references"
+  download "$BASE_URL/skills/agent-mux/SKILL.md"                    "$claude_dir/SKILL.md"
+  download "$BASE_URL/skills/agent-mux/references/tmux-agent.md"   "$claude_dir/references/tmux-agent.md"
+  download "$BASE_URL/skills/agent-mux/references/tmux.md"          "$claude_dir/references/tmux.md"
 }
 
 cmd_install() {
@@ -198,7 +208,7 @@ cmd_install() {
   mv "$BIN_DIR/agent-mux.tmp" "$BIN_DIR/agent-mux"
   chmod +x "$BIN_DIR/agent-mux"
 
-  # 7. Install Claude Code skill
+  # 7. Install skill (neutral + Claude Code paths)
   install_skill "$project_dir"
 
   # 8. Ensure PATH
@@ -210,16 +220,18 @@ cmd_install() {
   fi
 
   # 10. Done
-  local skill_rel="${project_dir/#$HOME/\~}/.claude/skills/agent-mux"
+  local neutral_rel="${project_dir/#$HOME/\~}/skills/agent-mux"
+  local claude_rel="${project_dir/#$HOME/\~}/.claude/skills/agent-mux"
   echo ""
   printf "${GREEN}${BOLD}agent-mux installed!${NC}\n"
   echo ""
   if [[ "$with_config" == true ]]; then
     echo "  Config:         ~/.agent-mux/tmux.conf"
   fi
-  echo "  tmux-agent:    ~/.agent-mux/bin/tmux-agent"
+  echo "  tmux-agent:     ~/.agent-mux/bin/tmux-agent"
   echo "  agent-mux CLI:  ~/.agent-mux/bin/agent-mux"
-  echo "  skill:          $skill_rel"
+  echo "  skill (neutral):  $neutral_rel"
+  echo "  skill (claude):   $claude_rel"
   if [[ "$with_config" != true ]]; then
     echo ""
     echo "  Tip: run 'agent-mux install --with-config' to also install the tmux config."
@@ -247,7 +259,7 @@ cmd_update() {
   mv "$BIN_DIR/agent-mux.tmp" "$BIN_DIR/agent-mux"
   chmod +x "$BIN_DIR/agent-mux"
 
-  if [[ -d "$PWD/.claude/skills/agent-mux" ]]; then
+  if [[ -d "$PWD/.claude/skills/agent-mux" ]] || [[ -d "$PWD/skills/agent-mux" ]]; then
     info "Updating agent-mux skill..."
     install_skill "$PWD"
   fi
@@ -318,9 +330,10 @@ Usage: agent-mux <command> [flags]
 
 Commands:
   install [--with-config]            Install agent-mux
-    [--project-dir <path>]             Default: installs tmux-agent, agent-mux CLI, and
-                                       the /agent-mux Claude Code skill (to .claude/skills/agent-mux/
-                                       in the current directory, or --project-dir if given).
+    [--project-dir <path>]             Installs tmux-agent, agent-mux CLI, and the skill
+                                       into two paths in the current dir (or --project-dir):
+                                         skills/agent-mux/        neutral — any agent
+                                         .claude/skills/agent-mux/ Claude Code /agent-mux
                                        --with-config: also installs the agent-mux tmux config
                                        and symlinks it to ~/.config/tmux/tmux.conf.
                                        Your existing config is backed up to ~/.agent-mux/backups/.
@@ -332,10 +345,11 @@ Commands:
 
 Files:
   ~/.agent-mux/tmux.conf              tmux configuration (downloaded by --with-config)
-  ~/.agent-mux/bin/tmux-agent        cross-pane communication CLI
+  ~/.agent-mux/bin/tmux-agent         cross-pane communication CLI
   ~/.agent-mux/bin/agent-mux          this CLI
   ~/.agent-mux/backups/               config backups (created by --with-config)
-  .claude/skills/agent-mux/           Claude Code /agent-mux skill (installed to project dir)
+  skills/agent-mux/                   skill — neutral path (any agent)
+  .claude/skills/agent-mux/           skill — Claude Code /agent-mux slash command
 EOF
 }
 
