@@ -43,12 +43,13 @@ error: must read the pane before interacting. Run: tmux-agent read codex
 | `tmux-agent type <target> <text>` | Type text without pressing Enter | `tmux-agent type codex "hello"` |
 | `tmux-agent send <target> <text>` | Read, send message, verify, and press Enter (full cycle) | `tmux-agent send codex "review src/auth.ts"` |
 | `tmux-agent message <target> <text>` | Type text with auto sender info and reply target | `tmux-agent message codex "review src/auth.ts"` |
-| `tmux-agent read <target> [lines]` | Read last N lines (default 50) | `tmux-agent read codex 100` |
+| `tmux-agent read <target> [lines]` | Read last N lines (default 50) | `tmux-agent read codex` |
 | `tmux-agent keys <target> <key>...` | Send special keys | `tmux-agent keys codex Enter` |
 | `tmux-agent name <target> <label>` | Label a pane (visible in tmux border) | `tmux-agent name %3 codex` |
 | `tmux-agent resolve <label>` | Print pane target for a label | `tmux-agent resolve codex` |
 | `tmux-agent id` | Print this pane's ID | `tmux-agent id` |
 | `tmux-agent doctor` | Diagnose tmux connectivity issues | `tmux-agent doctor` |
+| `tmux-agent version` | Print version | `tmux-agent version` |
 
 ### Target Resolution
 
@@ -73,20 +74,20 @@ Both intermediate pane reads are printed to stdout. Do NOT poll or read the targ
 `send` executes four steps internally. Use the manual cycle when you need to inspect the pane between steps:
 
 ```bash
-tmux-agent read codex 20                    # 1. READ — satisfy read guard
+tmux-agent read codex                       # 1. READ — satisfy read guard
 tmux-agent message codex 'Please review src/auth.ts'
                                              # 2. MESSAGE — auto-prepends sender info, no Enter
-tmux-agent read codex 20                    # 3. READ — verify text landed
+tmux-agent read codex                       # 3. READ — verify text landed
 tmux-agent keys codex Enter                 # 4. KEYS — submit
 ```
 
 **Approving a prompt (non-agent pane):**
 ```bash
-tmux-agent read worker 10                   # 1. READ — see the prompt
+tmux-agent read worker                      # 1. READ — see the prompt
 tmux-agent type worker "y"                  # 2. TYPE
-tmux-agent read worker 10                   # 3. READ — verify
+tmux-agent read worker                      # 3. READ — verify
 tmux-agent keys worker Enter                # 4. KEYS — submit
-tmux-agent read worker 20                   # 5. READ — see the result
+tmux-agent read worker                      # 5. READ — see the result
 ```
 
 ### Messaging Convention
@@ -211,15 +212,12 @@ done
 - Use `capture-pane -p` to print to stdout (essential for scripting)
 - Target format: `session:window.pane` (e.g., `shared:0.0`)
 
-## Loading this skill in other agents
+## Loading this skill
 
 | Agent | How to load |
 |---|---|
-| Claude Code | `/agent-mux` (after `agent-mux install` in your project) |
-| Codex | `/init` — reads `SKILL.md` automatically |
-| Gemini CLI | `@.claude/skills/agent-mux/SKILL.md` |
-| aider | `/add .claude/skills/agent-mux/SKILL.md` |
-| Any agent | Paste or include `SKILL.md` in system prompt |
+| Claude Code | `/agent-mux` slash command (after `agent-mux install` in your project) |
+| Other agents | Load `skills/agent-mux/SKILL.md` into context — paste into system prompt or use your agent's file-loading command |
 
 ## Environment
 
