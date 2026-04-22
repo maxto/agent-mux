@@ -1,10 +1,10 @@
 # agent-mux
 
-tmux for humans and multi-model AI teams. Works on Linux, macOS, and WSL2 (Windows Terminal).
+agent-mux is tmux for people and AI agents working in the same terminal.
 
-- **For humans** — tmux without the learning curve: Alt-key navigation, mouse support, and labeled panes. No prefix key, no config expertise required.
-- **For agents** — `tmux-agent` gives any CLI agent (Claude Code, Codex, aider, Gemini CLI, local models via Ollama, OpenDevin, or any bash-capable tool) a unified way to read, write, and communicate across panes.
-- **Multi-model workflows** — run multiple agents in parallel on the same codebase. Collaborative builds, adversarial review, cross-model verification — coordinated through tmux panes.
+- **Humans get a friendlier tmux**: Alt-key navigation, mouse support, labeled panes, and no prefix-key muscle memory required.
+- **Agents get a shared control layer**: `tmux-agent` lets Claude Code, Codex, Gemini CLI, aider, local models, and other bash-capable agents read panes, send input, and reply across panes.
+- **Teams get parallel model workflows**: run multiple agents on the same repo for implementation, review, testing, and cross-checking without leaving tmux.
 
 ## Quickstart
 
