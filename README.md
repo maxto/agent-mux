@@ -120,13 +120,15 @@ Installs the agent-mux tmux config: Alt-key navigation, mouse clipboard, labeled
 
 ### Mouse
 
-> Requires `agent-mux install --with-config`.
+> Requires `agent-mux install --with-config`. Verified on Windows 11 + WSL2 + Windows Terminal.
 
-- Click to select panes
-- Drag to select text — auto-copies to clipboard (clip.exe on WSL2, pbcopy on macOS, xclip/xsel on Linux)
-- Right-click — paste from Windows clipboard (WSL2, Windows Terminal native)
-- Shift+right-click — paste via context menu (verified paste)
-- Scroll wheel enters scroll mode
+| Action | Result |
+|---|---|
+| Click | Select pane |
+| Drag | Copy selected text to Windows clipboard |
+| Scroll wheel | Enter scroll mode |
+| `Shift+right-click` | Paste from Windows clipboard |
+| `Ctrl+Shift+V` | Paste from Windows clipboard |
 
 ## tmux-agent
 
