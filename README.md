@@ -187,23 +187,12 @@ See the [agent-mux skill](skills/agent-mux/SKILL.md) for full documentation on a
 
 A **skill** is a markdown file loaded into an agent's context that explains how to use a tool — in this case, how to use `tmux-agent` to read panes, send messages, and coordinate with other agents.
 
-`agent-mux install` automatically copies the skill into `.claude/skills/agent-mux/` in your current project. In Claude Code, invoke it with `/agent-mux` to load the full tmux-agent documentation into context.
-
-agent-mux works with any agent that can run bash. `agent-mux install` copies the skill to two paths:
+`agent-mux install` copies the skill to two paths:
 
 - **`skills/agent-mux/`** — neutral path, readable by any agent
-- **`.claude/skills/agent-mux/`** — Claude Code slash command support
+- **`.claude/skills/agent-mux/`** — Claude Code `/agent-mux` slash command
 
-How each agent loads the skill:
-
-| Agent | How to load the skill |
-|---|---|
-| Claude Code | `/agent-mux` slash command |
-| Codex | `/init` — reads `skills/agent-mux/SKILL.md` automatically |
-| Gemini CLI | `@skills/agent-mux/SKILL.md` |
-| aider | `/add skills/agent-mux/SKILL.md` |
-| Ollama / local models | Paste or include `skills/agent-mux/SKILL.md` in system prompt |
-| Other agents | Any agent that can read a file or accept a system prompt works |
+In **Claude Code**, load the skill with `/agent-mux`. For other agents, point them at `skills/agent-mux/SKILL.md` — any agent that can read a file or accept a system prompt can use it.
 
 For agents that support skills.sh, install via:
 
@@ -211,12 +200,10 @@ For agents that support skills.sh, install via:
 npx skills add maxto/agent-mux
 ```
 
-Works with Claude Code, Codex, Cursor, Copilot, and [45+ other agents](https://github.com/vercel-labs/skills#supported-agents).
-
 
 ## Requirements
 
 - Linux, Win-WSL2 (Windows Subsystem for Linux), or macOS (requires [Homebrew](https://brew.sh))
-- tmux 3.2+ — installed automatically by `agent-mux install` if missing
+- tmux 3.2+ — installed automatically by the global installer if missing
 - bash
 - curl or wget (for install)
