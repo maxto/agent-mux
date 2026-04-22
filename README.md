@@ -97,39 +97,26 @@ Installs the agent-mux tmux config: Alt-key navigation, mouse clipboard, labeled
 
 > Requires `agent-mux install --with-config`. All shortcuts use **Alt** on Linux/WSL2, **Option** on macOS — no prefix key.
 
-<table>
 
-<td valign="top">
-
-| Type | Key | Action |
-|---|---|---|
-| Pane | `Alt+i` | Navigate up (no wrap) |
-| Pane | `Alt+k` | Navigate down (no wrap) |
-| Pane | `Alt+j` | Navigate left (no wrap) |
-| Pane | `Alt+l` | Navigate right (no wrap) |
-| Pane | `Alt+n` | New pane (horizontal split, auto-tile) |
-| Pane | `Alt+w` | Close pane |
-| Pane | `Alt+o` | Cycle layouts |
-| Pane | `Alt+g` | Mark pane |
-| Pane | `Alt+y` | Swap with marked pane |
-
-</td>
-<td valign="top">
-
-| Type | Key | Action |
-|---|---|---|
-| Window | `Alt+m` | New window |
-| Window | `Alt+u` | Next window (no wrap) |
-| Window | `Alt+h` | Previous window (no wrap) |
-| Scroll | `Alt+Tab` | Toggle scroll mode |
-| Scroll | `i` / `k` | Scroll up / down (2 lines) |
-| Scroll | `I` / `K` | Half-page up / down |
-| Scroll | `q` or `Esc` | Exit scroll mode |
-| Scroll | scroll wheel | Enter scroll mode automatically |
-
-</td>
-
-</table>
+  | Type | Key | Action |
+  |---|---|---|
+  | Pane | `Alt+i` | Navigate up (no wrap) |
+  | Pane | `Alt+k` | Navigate down (no wrap) |
+  | Pane | `Alt+j` | Navigate left (no wrap) |
+  | Pane | `Alt+l` | Navigate right (no wrap) |
+  | Pane | `Alt+n` | New pane |
+  | Pane | `Alt+w` | Close pane |
+  | Pane | `Alt+o` | Cycle layouts |
+  | Pane | `Alt+g` | Mark pane |
+  | Pane | `Alt+y` | Swap with marked pane |
+  | Window | `Alt+m` | New window |
+  | Window | `Alt+u` | Next window |
+  | Window | `Alt+h` | Previous window |
+  | Scroll | `Alt+Tab` | Toggle scroll mode |
+  | Scroll | `i` / `k` | Scroll up / down |
+  | Scroll | `I` / `K` | Half-page up / down |
+  | Scroll | `q` / `Esc` | Exit scroll mode |
+  | Scroll | scroll wheel | Enter scroll mode automatically |
 
 ### Mouse
 
