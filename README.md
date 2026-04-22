@@ -93,44 +93,43 @@ Installs the agent-mux tmux config: Alt-key navigation, mouse clipboard, labeled
 | `skills/agent-mux/` | Skill — neutral path (Codex, Gemini, aider, any agent) |
 | `.claude/skills/agent-mux/` | Skill — Claude Code `/agent-mux` slash command |
 
-## Keybindings
+## Controls
 
-> These keybindings require the agent-mux tmux config. Install it with `agent-mux install --with-config`.
+> Requires `agent-mux install --with-config`. All shortcuts use **Alt** on Linux/WSL2, **Option** on macOS — no prefix key.
 
-All keybindings use **Alt** on Linux and WSL2 / **Option** on macOS — no prefix required.
+<table>
+<tr>
+<td valign="top">
 
-### Panes
+| Type | Key | Action |
+|---|---|---|
+| Pane | `Alt+i` | Navigate up (no wrap) |
+| Pane | `Alt+k` | Navigate down (no wrap) |
+| Pane | `Alt+j` | Navigate left (no wrap) |
+| Pane | `Alt+l` | Navigate right (no wrap) |
+| Pane | `Alt+n` | New pane (horizontal split, auto-tile) |
+| Pane | `Alt+w` | Close pane |
+| Pane | `Alt+o` | Cycle layouts |
+| Pane | `Alt+g` | Mark pane |
+| Pane | `Alt+y` | Swap with marked pane |
 
-| Key | Action |
-|---|---|
-| `Alt+i` | Navigate up (no wrap) |
-| `Alt+k` | Navigate down (no wrap) |
-| `Alt+j` | Navigate left (no wrap) |
-| `Alt+l` | Navigate right (no wrap) |
-| `Alt+n` | New pane (horizontal split + auto-tile) |
-| `Alt+w` | Close pane |
-| `Alt+o` | Cycle layouts |
-| `Alt+g` | Mark pane |
-| `Alt+y` | Swap with marked pane |
+</td>
+<td valign="top">
 
-### Windows
+| Type | Key | Action |
+|---|---|---|
+| Window | `Alt+m` | New window |
+| Window | `Alt+u` | Next window (no wrap) |
+| Window | `Alt+h` | Previous window (no wrap) |
+| Scroll | `Alt+Tab` | Toggle scroll mode |
+| Scroll | `i` / `k` | Scroll up / down (2 lines) |
+| Scroll | `I` / `K` | Half-page up / down |
+| Scroll | `q` or `Esc` | Exit scroll mode |
+| Scroll | scroll wheel | Enter scroll mode automatically |
 
-| Key | Action |
-|---|---|
-| `Alt+m` | New window |
-| `Alt+u` | Next window (no wrap) |
-| `Alt+h` | Previous window (no wrap) |
-
-### Scroll mode
-
-| Key | Action |
-|---|---|
-| `Alt+Tab` | Toggle scroll mode |
-| `i` / `k` | Scroll up / down (2 lines) |
-| `I` / `K` | Half-page up / down |
-| `q` or `Escape` | Exit scroll mode |
-
-Scroll wheel also enters scroll mode automatically.
+</td>
+</tr>
+</table>
 
 ### Mouse
 
