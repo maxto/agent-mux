@@ -6,7 +6,10 @@ tmux-agent
   type <t> <text>       type text (no Enter)
   keys <t> <key>        send special keys
   name <t> <label>      label a pane
+  resolve <label>       look up pane by label
+  message <t> <text>    type text with sender info (no Enter)
   id                    print this pane ID
+  version               print version
   doctor                diagnose connectivity
 
 pane navigation
