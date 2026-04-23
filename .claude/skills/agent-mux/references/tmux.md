@@ -1,6 +1,6 @@
 # tmux Session Control
 
-> **For cross-pane agent communication, use [`tmux-bridge`](./tmux-bridge.md)** — a higher-level CLI that handles target resolution, safe input, and wait-for-response. The raw tmux commands below are still useful as reference.
+> **For cross-pane agent communication, use [`tmux-agent`](./tmux-agent.md)** — a higher-level CLI that handles target resolution, safe input, and wait-for-response. The raw tmux commands below are still useful as reference.
 
 Control tmux sessions by sending keystrokes and reading output. Essential for managing Claude Code sessions.
 

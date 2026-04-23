@@ -248,18 +248,19 @@ cmd_message() {
   validate_target "$target"
   require_read "$target"
 
-  # Detect sender identity and location
   local sender_pane="${TMUX_PANE:-}"
   if [[ -z "$sender_pane" ]]; then
     die "not running inside a tmux pane (\$TMUX_PANE is unset)"
   fi
   local sender_label
   sender_label=$(tmx display-message -t "$sender_pane" -p '#{@name}' 2>/dev/null || true)
-  local from="${sender_label:-$sender_pane}"
+  local from_label="${sender_label:-$sender_pane}"
   local session_win
   session_win=$(tmx display-message -t "$sender_pane" -p '#{session_name}:#{window_index}.#{pane_index}' 2>/dev/null || true)
+  local msg_id
+  msg_id=$(printf '%s-%04x%04x' "$(date +%Y%m%dT%H%M%SZ)" "$RANDOM" "$RANDOM")
 
-  local header="[tmux-agent from:${from} pane:${sender_pane} at:${session_win} - load the agent-mux skill to reply]"
+  local header="[tmux-agent v1 from=${from_label} pane=${sender_pane} at=${session_win} msg=${msg_id} reply=${sender_pane}]"
   tmx send-keys -t "$target" -l -- "${header} ${*:2}"
   clear_read "$target"
 }
@@ -274,6 +275,7 @@ cmd_send() {
   cmd_read "$target"
   cmd_message "$target" "${@:2}"
   cmd_read "$target"
+  sleep 0.1
   cmd_keys "$target" Enter
 }
 
