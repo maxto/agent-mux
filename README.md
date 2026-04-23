@@ -122,13 +122,18 @@ Installs the agent-mux tmux config, backs up your existing one to `~/.agent-mux/
 
 ### Mouse
 
-> Requires `agent-mux install --with-config`. Verified on Windows 11 + Win-WSL2 + Windows Terminal.
+> The tmux mouse behavior requires `agent-mux install --with-config`. Click, drag, and scroll work anywhere tmux mouse mode and clipboard integration are supported. Windows Terminal also provides the paste shortcuts below.
 
 | Action | Result |
 |---|---|
 | Click | Select pane |
-| Drag | Copy selected text to Windows clipboard |
+| Drag | Copy selected text to system clipboard |
 | Scroll wheel | Enter scroll mode |
+
+**Windows Terminal paste shortcuts:**
+
+| Action | Result |
+|---|---|
 | `Shift+right-click` | Paste from Windows clipboard |
 | `Ctrl+Shift+V` | Paste from Windows clipboard |
 
