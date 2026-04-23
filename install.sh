@@ -100,6 +100,7 @@ ensure_path() {
     *)      rc_file="$HOME/.profile" ;;
   esac
 
+  # shellcheck disable=SC2016  # intentional: literal $HOME/$PATH written to rc file
   local path_line='export PATH="$HOME/.agent-mux/bin:$PATH"'
 
   if [[ -f "$rc_file" ]] && grep -qF '.agent-mux/bin' "$rc_file"; then
@@ -107,9 +108,7 @@ ensure_path() {
   fi
 
   info "Adding ~/.agent-mux/bin to PATH in $rc_file"
-  echo "" >> "$rc_file"
-  echo "# agent-mux" >> "$rc_file"
-  echo "$path_line" >> "$rc_file"
+  { echo ""; echo "# agent-mux"; echo "$path_line"; } >> "$rc_file"
   export PATH="$BIN_DIR:$PATH"
 }
 
@@ -189,7 +188,7 @@ cmd_global_install() {
   ensure_path
 
   echo ""
-  printf "${GREEN}${BOLD}agent-mux installed!${NC}\n"
+  printf '%s\n' "${GREEN}${BOLD}agent-mux installed!${NC}"
   echo ""
   echo "  tmux-agent:     ~/.agent-mux/bin/tmux-agent"
   echo "  agent-mux CLI:  ~/.agent-mux/bin/agent-mux"
@@ -231,14 +230,16 @@ cmd_install() {
     mkdir -p "$TMUX_XDG_DIR"
     ln -sf "$SMUX_DIR/tmux.conf" "$TMUX_XDG_DIR/tmux.conf"
     if tmux list-sessions &>/dev/null; then
-      tmux source-file "$SMUX_DIR/tmux.conf" 2>/dev/null && info "Reloaded tmux config." || true
+      if tmux source-file "$SMUX_DIR/tmux.conf" 2>/dev/null; then
+        info "Reloaded tmux config."
+      fi
     fi
   fi
 
   local neutral_rel="${project_dir/#$HOME/\~}/skills/agent-mux"
   local claude_rel="${project_dir/#$HOME/\~}/.claude/skills/agent-mux"
   echo ""
-  printf "${GREEN}${BOLD}agent-mux skill installed!${NC}\n"
+  printf '%s\n' "${GREEN}${BOLD}agent-mux skill installed!${NC}"
   echo ""
   echo "  skill (neutral):  $neutral_rel"
   echo "  skill (claude):   $claude_rel"
@@ -281,11 +282,13 @@ cmd_update() {
     info "Downloading tmux.conf..."
     download "$BASE_URL/.tmux.conf" "$SMUX_DIR/tmux.conf"
     if tmux list-sessions &>/dev/null; then
-      tmux source-file "$SMUX_DIR/tmux.conf" 2>/dev/null && info "Reloaded tmux config." || true
+      if tmux source-file "$SMUX_DIR/tmux.conf" 2>/dev/null; then
+        info "Reloaded tmux config."
+      fi
     fi
   fi
 
-  printf "${GREEN}${BOLD}agent-mux updated to v${VERSION}!${NC}\n"
+  printf '%s\n' "${GREEN}${BOLD}agent-mux updated to v${VERSION}!${NC}"
 }
 
 cmd_uninstall() {
@@ -299,6 +302,7 @@ cmd_uninstall() {
 
   # Check for backups to restore
   local latest_backup
+  # shellcheck disable=SC2012  # ls -t is safe here: filenames have no spaces (timestamp format)
   latest_backup=$(ls -t "$BACKUP_DIR"/tmux.conf.* 2>/dev/null | head -1 || true)
   if [[ -n "$latest_backup" ]]; then
     info "Restoring backup: $latest_backup"
@@ -311,7 +315,7 @@ cmd_uninstall() {
   info "Removed ~/.agent-mux/"
 
   echo ""
-  printf "${GREEN}${BOLD}agent-mux uninstalled.${NC}\n"
+  printf '%s\n' "${GREEN}${BOLD}agent-mux uninstalled.${NC}"
   echo ""
   echo "  Note: You may want to remove the PATH line from your shell rc file:"
   echo "    export PATH=\"\$HOME/.agent-mux/bin:\$PATH\""
