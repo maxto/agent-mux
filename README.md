@@ -64,7 +64,13 @@ Installs the skill into two paths: `skills/agent-mux/` (neutral, any agent) and 
 agent-mux install --with-config
 ```
 
-Installs the agent-mux tmux config: Alt-key navigation, mouse clipboard, labeled panes. Your existing config is backed up to `~/.agent-mux/backups/` and a symlink is created at `~/.config/tmux/tmux.conf`. Required for the keybindings described in this README.
+Installs the agent-mux tmux config, backs up your existing one to `~/.agent-mux/backups/` and symlinks it at `~/.config/tmux/tmux.conf`. Adds:
+
+- **Mouse support** — click to select pane, drag to copy, scroll wheel enters scroll mode
+- **Clipboard integration** — drag-to-copy writes to system clipboard (WSL, macOS, Linux)
+- **Alt-key navigation** — move between panes and windows without a prefix key
+- **Pane labels** — border shows pane name or current path
+- **10,000 line scrollback**
 
 ## agent-mux CLI
 
