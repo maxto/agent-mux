@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Mock curl for install tests. Handles: curl -fsSL <url> -o <dest>
+url="" dest=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -o) shift; dest="$1" ;;
+    http*) url="$1" ;;
+  esac
+  shift
+done
+[[ -z "$dest" ]] && exit 1
+mkdir -p "$(dirname "$dest")"
+case "$url" in
+  */tmux-agent)             printf '#!/usr/bin/env bash\necho "mock tmux-agent"\n' > "$dest"; chmod +x "$dest" ;;
+  */install.sh)             printf '#!/usr/bin/env bash\necho "mock agent-mux"\n'  > "$dest"; chmod +x "$dest" ;;
+  *.conf)                   echo "# mock tmux.conf" > "$dest" ;;
+  *.md|*/SKILL.md)          echo "# mock skill"     > "$dest" ;;
+  *.txt)                    echo "mock help"         > "$dest" ;;
+  *)                        echo "# mock: $url"      > "$dest" ;;
+esac
