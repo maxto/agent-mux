@@ -188,7 +188,7 @@ cmd_global_install() {
   ensure_path
 
   echo ""
-  printf '%s\n' "${GREEN}${BOLD}agent-mux installed!${NC}"
+  printf '%b\n' "${GREEN}${BOLD}agent-mux installed!${NC}"
   echo ""
   echo "  tmux-agent:     ~/.agent-mux/bin/tmux-agent"
   echo "  agent-mux CLI:  ~/.agent-mux/bin/agent-mux"
@@ -239,7 +239,7 @@ cmd_install() {
   local neutral_rel="${project_dir/#$HOME/\~}/skills/agent-mux"
   local claude_rel="${project_dir/#$HOME/\~}/.claude/skills/agent-mux"
   echo ""
-  printf '%s\n' "${GREEN}${BOLD}agent-mux skill installed!${NC}"
+  printf '%b\n' "${GREEN}${BOLD}agent-mux skill installed!${NC}"
   echo ""
   echo "  skill (neutral):  $neutral_rel"
   echo "  skill (claude):   $claude_rel"
@@ -288,7 +288,7 @@ cmd_update() {
     fi
   fi
 
-  printf '%s\n' "${GREEN}${BOLD}agent-mux updated to v${VERSION}!${NC}"
+  printf '%b\n' "${GREEN}${BOLD}agent-mux updated to v${VERSION}!${NC}"
 }
 
 cmd_uninstall() {
@@ -315,7 +315,7 @@ cmd_uninstall() {
   info "Removed ~/.agent-mux/"
 
   echo ""
-  printf '%s\n' "${GREEN}${BOLD}agent-mux uninstalled.${NC}"
+  printf '%b\n' "${GREEN}${BOLD}agent-mux uninstalled.${NC}"
   echo ""
   echo "  Note: You may want to remove the PATH line from your shell rc file:"
   echo "    export PATH=\"\$HOME/.agent-mux/bin:\$PATH\""
