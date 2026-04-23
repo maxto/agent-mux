@@ -4,7 +4,7 @@ tmux-agent
   send <t> <msg>        send message to pane
   read <t> [n]          read N lines from pane
   type <t> <text>       type text (no Enter)
-  keys <t> <key>        send special keys
+  keys <t> <key>...     send special keys
   name <t> <label>      label a pane
   resolve <label>       look up pane by label
   message <t> <text>    type text with sender info (no Enter)
@@ -32,9 +32,9 @@ scroll
   I / K                 half page
   q or Esc              exit scroll mode
 
-clipboard (WSL2)
+clipboard
 
-  drag to select        copy to Windows clipboard
-  right-click           paste (Windows Terminal native)
-  Shift+right-click     paste via context menu
+  drag to select        copy to system clipboard
+  Ctrl+Shift+V          paste (Windows Terminal)
+  Shift+right-click     paste (Windows Terminal)
 
