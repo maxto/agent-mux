@@ -2,7 +2,7 @@
 
 agent-mux is tmux for people and AI agents working in the same terminal.
 
-- **Humans get a friendlier tmux**: Alt-key navigation, mouse support, labeled panes, and no prefix-key muscle memory required.
+- **Humans get a friendlier tmux**: Alt-key navigation, mouse support, labeled panes, and no prefix-key muscle memory required (requires `agent-mux install --with-config`).
 - **Agents get a shared control layer**: `tmux-agent` lets Claude Code, Codex, Gemini CLI, aider, local models, and other bash-capable agents read panes, send input, and reply across panes.
 - **Teams get parallel model workflows**: run multiple agents on the same repo for implementation, review, testing, and cross-checking without leaving tmux.
 
@@ -92,7 +92,7 @@ Installs the agent-mux tmux config, backs up your existing one to `~/.agent-mux/
 | `~/.agent-mux/bin/agent-mux` | agent-mux CLI |
 | `~/.agent-mux/tmux.conf` | tmux config (downloaded by `--with-config`) |
 | `~/.agent-mux/backups/` | Config backups (created by `--with-config`) |
-| `skills/agent-mux/` | Skill — neutral path (Codex, Gemini, aider, any agent) |
+| `skills/agent-mux/` | Skill — neutral path, readable by any agent |
 | `.claude/skills/agent-mux/` | Skill — Claude Code `/agent-mux` slash command |
 
 ## Controls
@@ -150,7 +150,7 @@ A CLI to send text to any tmux pane — without copy-paste. Works from your shel
 | `tmux-agent read <target> [lines]` | Read last N lines from a pane (default: 50) |
 | `tmux-agent send <target> <text>` | Send a message — full cycle: read → type → verify → Enter |
 | `tmux-agent type <target> <text>` | Type text into a pane without pressing Enter |
-| `tmux-agent keys <target> <key>` | Send a special key (Enter, Escape, C-c…) |
+| `tmux-agent keys <target> <key>...` | Send one or more special keys (Enter, Escape, C-c…) |
 | `tmux-agent message <target> <text>` | Like `type`, but prepends sender info automatically (no Enter) |
 | `tmux-agent resolve <label>` | Get the pane ID for a label |
 | `tmux-agent id` | Print your own pane ID |
@@ -245,11 +245,7 @@ A **skill** is a markdown file loaded into an agent's context that explains how 
 
 In **Claude Code**, load the skill with `/agent-mux`. For other agents, point them at `skills/agent-mux/SKILL.md` — any agent that can read a file or accept a system prompt can use it.
 
-For agents that support skills.sh, install via:
-
-```bash
-npx skills add maxto/agent-mux
-```
+For other agents, point them at `skills/agent-mux/SKILL.md` — paste it into the system prompt or use your agent's file-loading command.
 
 
 ## Requirements
