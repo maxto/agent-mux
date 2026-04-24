@@ -4,8 +4,9 @@ set -euo pipefail
 
 VERSION="1.2.3"
 REPO="maxto/agent-mux"
-BRANCH="main"
+BRANCH="v${VERSION}"
 BASE_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
+MAIN_URL="https://raw.githubusercontent.com/${REPO}/main"
 SMUX_DIR="$HOME/.agent-mux"
 BIN_DIR="$SMUX_DIR/bin"
 BACKUP_DIR="$SMUX_DIR/backups"
@@ -257,14 +258,14 @@ cmd_update() {
   info "Updating agent-mux..."
 
   mkdir -p "$SMUX_DIR" "$BIN_DIR"
-  download "$BASE_URL/help.txt" "$SMUX_DIR/help.txt"
+  download "$MAIN_URL/help.txt" "$SMUX_DIR/help.txt"
 
   info "Downloading tmux-agent..."
-  download "$BASE_URL/scripts/tmux-agent" "$BIN_DIR/tmux-agent"
+  download "$MAIN_URL/scripts/tmux-agent" "$BIN_DIR/tmux-agent"
   chmod +x "$BIN_DIR/tmux-agent"
 
   info "Updating agent-mux CLI..."
-  download "$BASE_URL/install.sh" "$BIN_DIR/agent-mux.tmp"
+  download "$MAIN_URL/install.sh" "$BIN_DIR/agent-mux.tmp"
   mv "$BIN_DIR/agent-mux.tmp" "$BIN_DIR/agent-mux"
   chmod +x "$BIN_DIR/agent-mux"
 
@@ -280,7 +281,7 @@ cmd_update() {
     mkdir -p "$BACKUP_DIR"
     backup_existing
     info "Downloading tmux.conf..."
-    download "$BASE_URL/.tmux.conf" "$SMUX_DIR/tmux.conf"
+    download "$MAIN_URL/.tmux.conf" "$SMUX_DIR/tmux.conf"
     if tmux list-sessions &>/dev/null; then
       if tmux source-file "$SMUX_DIR/tmux.conf" 2>/dev/null; then
         info "Reloaded tmux config."
