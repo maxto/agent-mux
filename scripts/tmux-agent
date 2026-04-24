@@ -3,7 +3,7 @@
 # Any tool that can run bash can use this to talk to other panes.
 set -euo pipefail
 
-VERSION="1.2.0"
+VERSION="1.2.1"
 
 # --- Helpers ---
 
@@ -114,28 +114,27 @@ thread_write() {
 detect_socket() {
   # Explicit override
   if [[ -n "${TMUX_AGENT_SOCKET:-}" ]]; then
-    if [[ -S "$TMUX_AGENT_SOCKET" ]]; then
+    if tmux -S "$TMUX_AGENT_SOCKET" list-sessions &>/dev/null; then
       echo "$TMUX_AGENT_SOCKET"
       return
     fi
-    die "TMUX_AGENT_SOCKET=$TMUX_AGENT_SOCKET is not a valid socket"
+    die "TMUX_AGENT_SOCKET=$TMUX_AGENT_SOCKET is not a reachable tmux server"
   fi
 
   # Extract from $TMUX (format: "socket_path,pid,session_index")
   if [[ -n "${TMUX:-}" ]]; then
     local socket="${TMUX%%,*}"
-    if [[ -S "$socket" ]]; then
-      # Verify the socket is actually reachable
-      if tmux -S "$socket" list-sessions &>/dev/null; then
-        echo "$socket"
-        return
-      fi
+    if tmux -S "$socket" list-sessions &>/dev/null; then
+      echo "$socket"
+      return
     fi
   fi
 
   # Scan server sockets — pane-specific if $TMUX_PANE is known, otherwise any reachable server.
   # Check both /tmp and /private/tmp (macOS symlinks /tmp → /private/tmp,
-  # but some sandboxed environments only see one or the other)
+  # but some sandboxed environments only see one or the other).
+  # Skip -S file type check: some sandbox environments (e.g. Codex) set $TMUX but the
+  # socket path doesn't pass bash's [[ -S ]] even though tmux can reach it.
   local pane="${TMUX_PANE:-}"
   local uid
   uid=$(id -u)
@@ -143,7 +142,7 @@ detect_socket() {
   for sock_dir in "${sock_dirs[@]}"; do
     [[ -d "$sock_dir" ]] || continue
     for sock in "$sock_dir"/*; do
-      [[ -S "$sock" ]] || continue
+      [[ -e "$sock" ]] || continue
       if [[ -n "$pane" ]]; then
         if tmux -S "$sock" display-message -t "$pane" -p '#{pane_id}' &>/dev/null; then
           echo "$sock"; return
