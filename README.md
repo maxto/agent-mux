@@ -2,9 +2,27 @@
 
 agent-mux is tmux for humans and AI agents working in the same terminal.
 
+*A local multi-agent coordination layer for terminal-native AI coding workflows.*
+
 - **Humans get a friendlier tmux**: Alt-key navigation, mouse support, labeled panes, and no prefix-key muscle memory required (requires `agent-mux install --with-config`).
 - **Agents get a shared control layer**: `tmux-agent` lets Claude Code, Codex, Gemini CLI, aider, local models, and other bash-capable agents read panes, send input, reply across panes, and hand off large payloads without pasting them inline.
 - **Teams get parallel model workflows**: run multiple agents on the same repo for implementation, review, testing, and cross-checking without leaving tmux.
+
+## Why agent-mux?
+
+Without it:
+
+- copy-paste between terminal windows to hand off diffs, logs, or prompts
+- large payloads bloat the receiver's prompt context immediately
+- no shared routing — agents can't address or reply to each other
+- each agent works in isolation with no awareness of what others are doing
+
+With agent-mux:
+
+- agents send messages across panes with `tmux-agent send` — no copy-paste
+- large handoffs stay on disk via thread transport; the receiver loads them only when needed
+- replies route back to the sender automatically via pane ID
+- any agent (Claude Code, Codex, Gemini, Qwen, DeepSeek, aider…) can act as coordinator, implementer, or reviewer
 
 Large handoffs between agents no longer inflate the prompt. When a payload exceeds the inline threshold (default 2KB), `tmux-agent send` automatically switches to thread transport: the receiver sees only a compact ping, and the full content stays on disk until they explicitly call `tmux-agent thread read`. The threshold is configurable via `TMUX_AGENT_INLINE_THRESHOLD` — set it to `0` to always use file transport regardless of size.
 
@@ -38,6 +56,17 @@ The coordinator sets up the panes, launches the agents, and coordinates via `tmu
 ```
 
 See [`examples/hello-agents/`](examples/hello-agents/) for the full walkthrough.
+
+## Mental model
+
+| Role | Description |
+|---|---|
+| **Coordinator** | The agent currently orchestrating the session and delegating work |
+| **Workers** | Agents assigned to implement, review, test, or cross-check |
+| **tmux-agent** | The message bus — routes messages between panes |
+| **Thread transport** | Large artifact channel — keeps diffs, logs, and file content out of prompt context |
+
+Any agent can fill any role. Claude Code, Codex, Gemini, Qwen, DeepSeek, aider, or a local model — roles are assigned per session, not hardcoded.
 
 ## Install
 
