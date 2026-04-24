@@ -77,6 +77,12 @@ make_payload() {
   [[ "$output" == *"thread: "* ]]
 }
 
+@test "send: threshold=0 forces file transport for empty payload (prints thread:)" {
+  TMUX_AGENT_INLINE_THRESHOLD=0 run bash "$TMUX_AGENT" send "$TARGET_PANE" ""
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"thread: "* ]]
+}
+
 # ── --file flag always uses file transport ────────────────────────────────────
 
 @test "send --file: always uses file transport regardless of payload size" {

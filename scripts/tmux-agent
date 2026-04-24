@@ -364,8 +364,8 @@ cmd_send() {
   local threshold
   threshold=$(inline_threshold)
 
-  # Auto-spill: payloads over threshold go to file-based transport (threshold=0 always spills)
-  if (( ${#text} > threshold )); then
+  # Auto-spill: threshold=0 always spills; otherwise spill when payload exceeds threshold
+  if (( threshold == 0 || ${#text} > threshold )); then
     cmd_send_file "$target" "$text"; return
   fi
 
@@ -390,7 +390,7 @@ cmd_send_file() {
   local thread_id tdir
   thread_id=$(new_thread_id)
   tdir="$(thread_base)/${thread_id}"
-  mkdir -p "${tdir}/messages" "${tdir}/cursors"
+  mkdir -p "${tdir}/messages"
 
   local sender_label session_win
   sender_label=$(tmx display-message -t "$sender_pane" -p '#{@name}' 2>/dev/null || true)
