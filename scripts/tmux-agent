@@ -80,7 +80,9 @@ release_lock() {
 
 next_seq() {
   local msg_dir="${1}/messages" count=0
-  for f in "${msg_dir}"/*.md; do [[ -f "$f" ]] && (( count++ )) || true; done
+  for f in "${msg_dir}"/*.md; do
+    if [[ -f "$f" ]]; then (( ++count )); fi
+  done
   printf '%06d' $(( count + 1 ))
 }
 
