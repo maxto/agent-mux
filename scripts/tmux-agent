@@ -3,7 +3,7 @@
 # Any tool that can run bash can use this to talk to other panes.
 set -euo pipefail
 
-VERSION="1.2.1"
+VERSION="1.2.2"
 
 # --- Helpers ---
 
@@ -220,7 +220,8 @@ Target resolution:
   Labels are resolved automatically — e.g. 'tmux-agent type codex "hello"' works.
 
 Environment:
-  TMUX_AGENT_SOCKET   Override the tmux server socket path (skips auto-detection)
+  TMUX_AGENT_SOCKET            Override the tmux server socket path (skips auto-detection)
+  TMUX_AGENT_INLINE_THRESHOLD  Max bytes for inline send before auto-spill to file transport (default: 2048; 0 = always file)
 EOF
   exit 0
 }
@@ -341,6 +342,15 @@ cmd_message() {
   clear_read "$target"
 }
 
+inline_threshold() {
+  # Use - (not :-) so empty string is treated as invalid, not as "unset"
+  local raw="${TMUX_AGENT_INLINE_THRESHOLD-2048}"
+  if [[ ! "$raw" =~ ^[0-9]+$ ]]; then
+    die "TMUX_AGENT_INLINE_THRESHOLD must be a non-negative integer, got: ${raw:-<empty>}"
+  fi
+  echo "$raw"
+}
+
 cmd_send() {
   require_args 2 $# "send"
   require_tmux
@@ -351,9 +361,11 @@ cmd_send() {
   target=$(resolve_target "$1")
   validate_target "$target"
   local text="${*:2}"
+  local threshold
+  threshold=$(inline_threshold)
 
-  # Auto-spill: payloads over 2KB go to file-based transport
-  if (( ${#text} > 2048 )); then
+  # Auto-spill: payloads over threshold go to file-based transport (threshold=0 always spills)
+  if (( ${#text} > threshold )); then
     cmd_send_file "$target" "$text"; return
   fi
 
@@ -675,10 +687,11 @@ cmd_thread_gc() {
 [[ $# -eq 0 ]] && usage
 
 case "$1" in
-  id)      shift; cmd_id "$@"; exit ;;
+  id)        shift; cmd_id "$@"; exit ;;
   -h|--help|help) usage ;;
-  version) echo "tmux-agent $VERSION"; exit ;;
-  thread)  shift; cmd_thread "$@"; exit ;;
+  version)   echo "tmux-agent $VERSION"; exit ;;
+  thread)    shift; cmd_thread "$@"; exit ;;
+  threshold) inline_threshold; exit ;;
 esac
 
 # All other commands need the socket
