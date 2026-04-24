@@ -520,11 +520,27 @@ cmd_doctor() {
   echo "---"
   if $ok; then
     echo "Status: OK"
+    # Print socket hint for subprocess/sandbox environments where $TMUX is not inherited
+    if [[ "$detected" != "__default__" && -n "$detected" && "$detected" != "__failed__" ]]; then
+      echo ""
+      echo "Tip: if running tmux-agent from a subprocess that does not inherit \$TMUX,"
+      echo "set this before calling tmux-agent:"
+      echo "  export TMUX_AGENT_SOCKET=$detected"
+    fi
   else
     echo "Status: ISSUES DETECTED"
     echo ""
-    echo "Likely cause: \$TMUX env var is stale (terminal was restarted)."
-    echo "Fix: re-source tmux env or set TMUX_AGENT_SOCKET explicitly."
+    if [[ -n "${TMUX_PANE:-}" && -z "${TMUX:-}" ]]; then
+      echo "Likely cause: \$TMUX is unset but \$TMUX_PANE=${TMUX_PANE} is set."
+      echo "This happens when running from a subprocess that did not inherit the tmux env."
+      echo ""
+      echo "Fix: find the socket with 'ls /tmp/tmux-$(id -u)/' from an interactive tmux"
+      echo "shell and then set:"
+      echo "  export TMUX_AGENT_SOCKET=/tmp/tmux-$(id -u)/default"
+    else
+      echo "Likely cause: \$TMUX env var is stale (terminal was restarted)."
+      echo "Fix: re-source tmux env or set TMUX_AGENT_SOCKET explicitly."
+    fi
     return 1
   fi
 }
