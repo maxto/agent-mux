@@ -46,6 +46,14 @@ thread_base() {
   echo "${XDG_RUNTIME_DIR:-/tmp/agent-mux-${uid}}/threads"
 }
 
+# Cursor storage is always local to the reading agent — separate from thread
+# storage so agents can read threads on read-only paths (e.g. sandboxed XDG).
+cursor_base() {
+  local uid
+  uid=$(id -u)
+  echo "${TMUX_AGENT_CURSOR_DIR:-/tmp/agent-mux-${uid}/cursors}"
+}
+
 file_mtime() {
   stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo 0
 }
@@ -550,7 +558,10 @@ cmd_thread_read() {
   [[ -d "${tdir}/messages" ]] || die "thread not found: $thread_id"
 
   local pane_id="${TMUX_PANE:-unknown}"
-  local cursor_file="${tdir}/cursors/${pane_id//%/_}"
+  local cursor_dir
+  cursor_dir="$(cursor_base)/${thread_id}"
+  mkdir -p "$cursor_dir"
+  local cursor_file="${cursor_dir}/${pane_id//%/_}"
   local start_seq=1
 
   if $since_cursor && [[ -f "$cursor_file" ]]; then
@@ -570,7 +581,7 @@ cmd_thread_read() {
 
   if (( last_seq > 0 )); then
     local tmp
-    tmp=$(mktemp "${tdir}/cursors/.cur-XXXXXX")
+    tmp=$(mktemp "${cursor_dir}/.cur-XXXXXX")
     printf '%06d' "$last_seq" > "$tmp"
     mv "$tmp" "$cursor_file"
   fi
@@ -625,7 +636,23 @@ cmd_thread_gc() {
     fi
   done
 
-  echo "gc: removed ${removed} thread(s), broke ${broken} stale lock(s)"
+  # Remove orphaned cursor dirs for threads that no longer exist
+  local cursor_base_dir orphaned=0
+  cursor_base_dir=$(cursor_base)
+  if [[ -d "$cursor_base_dir" ]]; then
+    for cdir in "${cursor_base_dir}"/*/; do
+      cdir="${cdir%/}"
+      [[ -d "$cdir" ]] || continue
+      local tid
+      tid=$(basename "$cdir")
+      if [[ ! -d "${base}/${tid}" ]]; then
+        rm -rf "$cdir"
+        (( orphaned++ )) || true
+      fi
+    done
+  fi
+
+  echo "gc: removed ${removed} thread(s), broke ${broken} stale lock(s), cleaned ${orphaned} orphaned cursor dir(s)"
 }
 
 # --- Main ---

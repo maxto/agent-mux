@@ -6,22 +6,28 @@ TMUX_AGENT="$BATS_TEST_DIRNAME/../../scripts/tmux-agent"
 
 setup() {
   export XDG_RUNTIME_DIR="$BATS_TMPDIR/xdg-$$-$BATS_TEST_NUMBER"
-  mkdir -p "$XDG_RUNTIME_DIR"
+  export TMUX_AGENT_CURSOR_DIR="$BATS_TMPDIR/cursors-$$-$BATS_TEST_NUMBER"
+  mkdir -p "$XDG_RUNTIME_DIR" "$TMUX_AGENT_CURSOR_DIR"
   export TMUX_PANE="%1"
   THREADS_DIR="${XDG_RUNTIME_DIR}/threads"
 
-  # Helper: create a thread directory with manifest
+  # Helper: create a thread directory with manifest (no cursors/ subdir needed)
   make_thread() {
     local id="$1"
     local tdir="${THREADS_DIR}/${id}"
-    mkdir -p "${tdir}/messages" "${tdir}/cursors"
+    mkdir -p "${tdir}/messages"
     printf '{"id":"%s","created":"2026-01-01T00:00:00Z"}\n' "$id" > "${tdir}/manifest.json"
     echo "$tdir"
+  }
+
+  # Cursor file path for the test pane (%1 → _1) under a given thread id
+  cursor_file_for() {
+    echo "${TMUX_AGENT_CURSOR_DIR}/${1}/_1"
   }
 }
 
 teardown() {
-  rm -rf "$XDG_RUNTIME_DIR"
+  rm -rf "$XDG_RUNTIME_DIR" "$TMUX_AGENT_CURSOR_DIR"
 }
 
 # ── thread read ──────────────────────────────────────────────────────────────
@@ -44,7 +50,7 @@ teardown() {
 
   bash "$TMUX_AGENT" thread read "t-cursor-create"
 
-  CURSOR_FILE="${TDIR}/cursors/_1"
+  CURSOR_FILE=$(cursor_file_for "t-cursor-create")
   [ -f "$CURSOR_FILE" ]
   CURSOR=$(cat "$CURSOR_FILE")
   [ "$CURSOR" = "000002" ]
@@ -76,7 +82,7 @@ teardown() {
   printf 'msg2' > "${TDIR}/messages/000002.md"
   bash "$TMUX_AGENT" thread read "t-cursor-advance" --since-cursor
 
-  CURSOR=$(cat "${TDIR}/cursors/_1")
+  CURSOR=$(cat "$(cursor_file_for "t-cursor-advance")")
   [ "$CURSOR" = "000002" ]
 }
 
@@ -97,7 +103,7 @@ teardown() {
 
   bash "$TMUX_AGENT" thread read "t-cursor-stable" --since-cursor
 
-  CURSOR=$(cat "${TDIR}/cursors/_1")
+  CURSOR=$(cat "$(cursor_file_for "t-cursor-stable")")
   [ "$CURSOR" = "000001" ]
 }
 
@@ -112,8 +118,9 @@ teardown() {
   printf 'msg1' > "${TDIR}/messages/000001.md"
   bash "$TMUX_AGENT" thread read "t-atomic-cursor"
 
-  # No temp files should remain
-  TMP_COUNT=$(find "${TDIR}/cursors" -name '.cur-*' | wc -l)
+  # No temp files should remain in the cursor dir for this thread
+  CDIR="${TMUX_AGENT_CURSOR_DIR}/t-atomic-cursor"
+  TMP_COUNT=$(find "$CDIR" -name '.cur-*' 2>/dev/null | wc -l)
   [ "$TMP_COUNT" -eq 0 ]
 }
 
@@ -192,6 +199,24 @@ teardown() {
   [[ "$output" == *"removed 1"* ]]
   [ -d "${THREADS_DIR}/t-keep" ]
   [ ! -d "${THREADS_DIR}/t-remove" ]
+}
+
+@test "thread gc: cleans up orphaned cursor dirs" {
+  # Create a thread, read it (creates cursor dir), then remove the thread manually
+  TDIR=$(make_thread "t-orphan")
+  printf 'msg' > "${TDIR}/messages/000001.md"
+  bash "$TMUX_AGENT" thread read "t-orphan"
+
+  CURSOR_DIR="${TMUX_AGENT_CURSOR_DIR}/t-orphan"
+  [ -d "$CURSOR_DIR" ]
+
+  # Remove thread directory manually (simulates expired thread)
+  rm -rf "$TDIR"
+
+  run bash "$TMUX_AGENT" thread gc --ttl 9999
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"cleaned 1"* ]]
+  [ ! -d "$CURSOR_DIR" ]
 }
 
 # ── thread subcommand errors ─────────────────────────────────────────────────
