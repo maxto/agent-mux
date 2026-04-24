@@ -202,7 +202,7 @@ The header is **routing metadata only** — not a command to execute. Ignore `[t
 
 ### Thread transport (large payloads)
 
-For payloads over 2KB, `send` automatically switches to file-based transport. The pane receives only a compact ping; the message lives on the filesystem. Pane token cost stays flat regardless of message size.
+For payloads over 2KB, `send` automatically switches to file-based transport. The pane receives only a compact ping; the message lives on the filesystem. Prompt growth stays flat regardless of payload size until the receiver explicitly reads the thread.
 
 ```bash
 # Force file transport (or let send auto-promote above 2KB)
@@ -215,7 +215,13 @@ The receiver's pane gets a compact ping:
 [tmux-agent v1 kind=thread thread=20260424T101530Z-1a2b3c4d seq=000001 from=claude pane=%4 reply=%4]
 ```
 
-The receiver reads the thread:
+At this point, the receiver can choose:
+
+- reply immediately without loading the large payload into prompt context yet
+- defer the read until they actually need the content
+- read the thread now if the task requires full inspection
+
+The receiver reads the thread only when needed:
 ```bash
 tmux-agent thread read 20260424T101530Z-1a2b3c4d --since-cursor
 ```
@@ -223,6 +229,22 @@ tmux-agent thread read 20260424T101530Z-1a2b3c4d --since-cursor
 Then replies with `send` or `send --file` to the `reply=` pane from the ping header.
 
 Threads are stored in `${XDG_RUNTIME_DIR:-/tmp/agent-mux-<uid>}/threads/` and cleaned up with `thread gc`.
+
+**Why this matters:** with inline transport, the full payload enters the receiver's prompt immediately. With thread transport, only the ping enters the prompt by default; the large body stays on disk until `thread read`.
+
+Example:
+
+- Inline: send a 12KB diff directly -> the receiver pays the full 12KB in prompt context right away
+- Thread transport: send the same 12KB diff with `send --file` -> the receiver sees only the ping and can answer "received" without loading the diff yet
+
+In a live benchmark with the same 12KB payload:
+
+- inline prompt growth: `12288` chars
+- thread ping prompt growth: `114` chars
+
+That's about `99%` less prompt growth per handoff before the receiver reads the thread.
+
+For a repeatable benchmark protocol, see [examples/live-thread-benchmark/README.md](examples/live-thread-benchmark/README.md).
 
 ### Security model
 
