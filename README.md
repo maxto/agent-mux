@@ -1,6 +1,6 @@
 # agent-mux
 
-agent-mux is tmux for people and AI agents working in the same terminal.
+agent-mux is tmux for humans and AI agents working in the same terminal.
 
 - **Humans get a friendlier tmux**: Alt-key navigation, mouse support, labeled panes, and no prefix-key muscle memory required (requires `agent-mux install --with-config`).
 - **Agents get a shared control layer**: `tmux-agent` lets Claude Code, Codex, Gemini CLI, aider, local models, and other bash-capable agents read panes, send input, and reply across panes.
