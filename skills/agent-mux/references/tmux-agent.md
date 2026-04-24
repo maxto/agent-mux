@@ -195,6 +195,8 @@ tmux-agent send codex 'Please review the changes in src/auth.ts and suggest impr
 | Variable | Description |
 |---|---|
 | `TMUX_AGENT_SOCKET` | Override the tmux server socket path (skips auto-detection) |
+| `TMUX_AGENT_CURSOR_DIR` | Override cursor storage directory (default: `/tmp/agent-mux-<uid>/cursors`) |
+| `TMUX_AGENT_INLINE_THRESHOLD` | Max bytes for inline `send` before auto-spill to file transport (default: `2048`; `0` = always file) |
 
 ## Tips
 
