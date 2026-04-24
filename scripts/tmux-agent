@@ -3,7 +3,7 @@
 # Any tool that can run bash can use this to talk to other panes.
 set -euo pipefail
 
-VERSION="1.1.0"
+VERSION="1.2.0"
 
 # --- Helpers ---
 
@@ -34,6 +34,69 @@ require_read() {
 
 clear_read() {
   rm -f "$(read_guard_path "$1")"
+}
+
+# --- Thread System ---
+# File-based transport for large payloads. The pane receives only a compact
+# ping; the actual message lives in a filesystem thread directory.
+
+thread_base() {
+  local uid
+  uid=$(id -u)
+  echo "${XDG_RUNTIME_DIR:-/tmp/agent-mux-${uid}}/threads"
+}
+
+file_mtime() {
+  stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo 0
+}
+
+acquire_lock() {
+  local tdir="$1" lock_dir
+  lock_dir="${1}/.lock"
+  local deadline=$(( $(date +%s) + 10 ))
+
+  while ! mkdir "$lock_dir" 2>/dev/null; do
+    if [[ -d "$lock_dir" ]]; then
+      local lock_age=$(( $(date +%s) - $(file_mtime "$lock_dir") ))
+      if (( lock_age > 30 )); then
+        local lock_alive=false pid_file="${lock_dir}/pid"
+        if [[ -f "$pid_file" ]]; then
+          local lp
+          lp=$(cat "$pid_file" 2>/dev/null || true)
+          [[ -n "$lp" ]] && kill -0 "$lp" 2>/dev/null && lock_alive=true
+        fi
+        if ! $lock_alive; then rm -rf "$lock_dir"; continue; fi
+      fi
+    fi
+    (( $(date +%s) >= deadline )) && die "could not acquire thread lock after 10s"
+    sleep 0.05
+  done
+  echo $$ > "${lock_dir}/pid"
+}
+
+release_lock() {
+  rm -rf "${1}/.lock"
+}
+
+next_seq() {
+  local msg_dir="${1}/messages" count=0
+  for f in "${msg_dir}"/*.md; do [[ -f "$f" ]] && (( count++ )) || true; done
+  printf '%06d' $(( count + 1 ))
+}
+
+new_thread_id() {
+  printf '%s-%04x%04x' "$(date +%Y%m%dT%H%M%SZ)" "$RANDOM" "$RANDOM"
+}
+
+thread_write() {
+  local tdir="$1" text="$2" tmp seq
+  acquire_lock "$tdir"
+  seq=$(next_seq "$tdir")
+  tmp=$(mktemp "${tdir}/messages/.msg-XXXXXX")
+  printf '%s' "$text" > "$tmp"
+  mv "$tmp" "${tdir}/messages/${seq}.md"
+  release_lock "$tdir"
+  echo "$seq"
 }
 
 # Detect the correct tmux server socket.
@@ -138,6 +201,10 @@ Commands:
   id                        Print this pane's ID ($TMUX_PANE)
   doctor                    Diagnose tmux connectivity issues
   version                   Print version
+
+  send --file <target> <text>              File-based transport (auto if payload >2KB)
+  thread read <id> [--since-cursor]        Read thread messages (all or since cursor)
+  thread gc [--ttl <sec>]                  Remove old threads (default TTL: 3600s)
 
 Target resolution:
   Targets can be tmux native (session:window.pane, %N) or a label set via 'name'.
@@ -268,15 +335,64 @@ cmd_message() {
 cmd_send() {
   require_args 2 $# "send"
   require_tmux
+  if [[ "${1:-}" == "--file" ]]; then
+    shift; cmd_send_file "$@"; return
+  fi
   local target
   target=$(resolve_target "$1")
   validate_target "$target"
+  local text="${*:2}"
+
+  # Auto-spill: payloads over 2KB go to file-based transport
+  if (( ${#text} > 2048 )); then
+    cmd_send_file "$target" "$text"; return
+  fi
 
   cmd_read "$target"
   cmd_message "$target" "${@:2}"
   cmd_read "$target"
   sleep 0.1
   cmd_keys "$target" Enter
+}
+
+cmd_send_file() {
+  require_args 2 $# "send --file"
+  require_tmux
+  local target
+  target=$(resolve_target "$1")
+  validate_target "$target"
+  local text="${*:2}"
+
+  local sender_pane="${TMUX_PANE:-}"
+  [[ -z "$sender_pane" ]] && die "not running inside a tmux pane (\$TMUX_PANE is unset)"
+
+  local thread_id tdir
+  thread_id=$(new_thread_id)
+  tdir="$(thread_base)/${thread_id}"
+  mkdir -p "${tdir}/messages" "${tdir}/cursors"
+
+  local sender_label session_win
+  sender_label=$(tmx display-message -t "$sender_pane" -p '#{@name}' 2>/dev/null || true)
+  local from_label="${sender_label:-$sender_pane}"
+  session_win=$(tmx display-message -t "$sender_pane" -p '#{session_name}:#{window_index}.#{pane_index}' 2>/dev/null || true)
+
+  printf '{"id":"%s","created":"%s","from":"%s","from_pane":"%s"}\n' \
+    "$thread_id" "$(date -u +%Y%m%dT%H%M%SZ)" "$from_label" "$sender_pane" \
+    > "${tdir}/manifest.json"
+
+  # Write message atomically — ping is sent ONLY after successful write
+  local seq
+  seq=$(thread_write "$tdir" "$text")
+
+  local ping="[tmux-agent v1 kind=thread thread=${thread_id} seq=${seq} from=${from_label} pane=${sender_pane} at=${session_win} reply=${sender_pane}]"
+  cmd_read "$target"
+  tmx send-keys -t "$target" -l -- "$ping"
+  clear_read "$target"
+  cmd_read "$target"
+  sleep 0.1
+  cmd_keys "$target" Enter
+
+  echo "thread: $thread_id"
 }
 
 cmd_read() {
@@ -403,6 +519,113 @@ cmd_doctor() {
   fi
 }
 
+cmd_thread() {
+  local subcmd="${1:-}"
+  shift || true
+  case "$subcmd" in
+    read) cmd_thread_read "$@" ;;
+    gc)   cmd_thread_gc "$@" ;;
+    "")   die "thread requires a subcommand: read, gc" ;;
+    *)    die "unknown thread subcommand: $subcmd. Use: read, gc" ;;
+  esac
+}
+
+cmd_thread_read() {
+  require_args 1 $# "thread read"
+  local thread_id="$1"
+  local since_cursor=false
+  shift
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --since-cursor) since_cursor=true ;;
+      *) die "unknown option: $1" ;;
+    esac
+    shift
+  done
+
+  local tdir
+  tdir="$(thread_base)/${thread_id}"
+  [[ -d "${tdir}/messages" ]] || die "thread not found: $thread_id"
+
+  local pane_id="${TMUX_PANE:-unknown}"
+  local cursor_file="${tdir}/cursors/${pane_id//%/_}"
+  local start_seq=1
+
+  if $since_cursor && [[ -f "$cursor_file" ]]; then
+    start_seq=$(( 10#$(cat "$cursor_file") + 1 ))
+  fi
+
+  local last_seq=0
+  for msg_file in "${tdir}/messages/"*.md; do
+    [[ -f "$msg_file" ]] || continue
+    local seq
+    seq=$(basename "$msg_file" .md)
+    if (( 10#$seq >= start_seq )); then
+      cat "$msg_file"
+      last_seq=$(( 10#$seq ))
+    fi
+  done
+
+  if (( last_seq > 0 )); then
+    local tmp
+    tmp=$(mktemp "${tdir}/cursors/.cur-XXXXXX")
+    printf '%06d' "$last_seq" > "$tmp"
+    mv "$tmp" "$cursor_file"
+  fi
+}
+
+cmd_thread_gc() {
+  local ttl=3600
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --ttl) ttl="$2"; shift 2 ;;
+      *) die "unknown option: $1" ;;
+    esac
+  done
+
+  local base
+  base=$(thread_base)
+  [[ -d "$base" ]] || { echo "gc: no threads"; return 0; }
+
+  local now removed=0 broken=0
+  now=$(date +%s)
+
+  for tdir in "${base}"/*/; do
+    tdir="${tdir%/}"
+    [[ -d "$tdir" ]] || continue
+
+    local lock_dir="${tdir}/.lock"
+    if [[ -d "$lock_dir" ]]; then
+      local lock_age=$(( now - $(file_mtime "$lock_dir") ))
+      if (( lock_age > 30 )); then
+        local lock_alive=false pid_file="${lock_dir}/pid"
+        if [[ -f "$pid_file" ]]; then
+          local lp
+          lp=$(cat "$pid_file" 2>/dev/null || true)
+          [[ -n "$lp" ]] && kill -0 "$lp" 2>/dev/null && lock_alive=true
+        fi
+        if ! $lock_alive; then rm -rf "$lock_dir"; (( broken++ )) || true; fi
+      fi
+    fi
+
+    local latest
+    latest=$(file_mtime "$tdir")
+    for msg in "${tdir}/messages/"*.md; do
+      [[ -f "$msg" ]] || continue
+      local mt
+      mt=$(file_mtime "$msg")
+      (( mt > latest )) && latest=$mt
+    done
+
+    if (( now - latest > ttl )); then
+      rm -rf "$tdir"
+      (( removed++ )) || true
+    fi
+  done
+
+  echo "gc: removed ${removed} thread(s), broke ${broken} stale lock(s)"
+}
+
 # --- Main ---
 
 [[ $# -eq 0 ]] && usage
@@ -411,6 +634,7 @@ case "$1" in
   id)      shift; cmd_id "$@"; exit ;;
   -h|--help|help) usage ;;
   version) echo "tmux-agent $VERSION"; exit ;;
+  thread)  shift; cmd_thread "$@"; exit ;;
 esac
 
 # All other commands need the socket
