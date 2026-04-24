@@ -3,7 +3,7 @@
 agent-mux is tmux for humans and AI agents working in the same terminal.
 
 - **Humans get a friendlier tmux**: Alt-key navigation, mouse support, labeled panes, and no prefix-key muscle memory required (requires `agent-mux install --with-config`).
-- **Agents get a shared control layer**: `tmux-agent` lets Claude Code, Codex, Gemini CLI, aider, local models, and other bash-capable agents read panes, send input, and reply across panes.
+- **Agents get a shared control layer**: `tmux-agent` lets Claude Code, Codex, Gemini CLI, aider, local models, and other bash-capable agents read panes, send input, reply across panes, and hand off large payloads without pasting them inline.
 - **Teams get parallel model workflows**: run multiple agents on the same repo for implementation, review, testing, and cross-checking without leaving tmux.
 
 Large handoffs between agents no longer inflate the prompt. When a payload exceeds the inline threshold (default 2KB), `tmux-agent send` automatically switches to thread transport: the receiver sees only a compact ping, and the full content stays on disk until they explicitly call `tmux-agent thread read`. The threshold is configurable via `TMUX_AGENT_INLINE_THRESHOLD` — set it to `0` to always use file transport regardless of size.
