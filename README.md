@@ -57,6 +57,16 @@ The coordinator sets up the panes, launches the agents, and coordinates via `tmu
 
 See [`examples/hello-agents/`](examples/hello-agents/) for the full walkthrough.
 
+## Demo
+
+A deterministic, no-credentials demo showing cross-pane messaging and thread transport:
+
+```bash
+bash examples/demo-recording/demo.sh
+```
+
+See [`examples/demo-recording/`](examples/demo-recording/) for recording instructions (asciinema + agg).
+
 ## Mental model
 
 | Role | Description |
