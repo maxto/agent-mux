@@ -31,6 +31,7 @@ Large handoffs between agents no longer inflate the prompt. When a payload excee
 ```bash
 # 1. Install global tools — once per machine
 curl -fsSL https://maxto.github.io/agent-mux/install.sh | bash
+source ~/.bashrc   # or open a new terminal
 
 # 2. Install the skill — once per project
 cd your-project
