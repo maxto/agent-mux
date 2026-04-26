@@ -11,10 +11,10 @@ Tmux pane control and cross-pane agent communication. Use `tmux-agent` (the high
 
 ## Prerequisites
 
-`tmux-agent` requires running **inside an active tmux session** (`$TMUX` must be set). Check first:
+**Cross-pane send/reply workflows require running inside a tmux pane** (`$TMUX` must be set). Check first:
 
 ```bash
-[ -n "$TMUX" ] && echo "in tmux ✓" || echo "NOT in tmux — tmux-agent will not work"
+[ -n "$TMUX" ] && echo "in tmux ✓" || echo "NOT in tmux — cross-pane workflows will not work"
 ```
 
 **If you are NOT in tmux:** ask the user to start a tmux session, then re-launch the agent from inside it:
@@ -23,18 +23,18 @@ Tmux pane control and cross-pane agent communication. Use `tmux-agent` (the high
 tmux new-session -s agents   # starts tmux and attaches; launch your agent from here
 ```
 
+**If tmux is running but you are outside a pane** (e.g. a detached process), set the socket explicitly — subcommands like `list` and `doctor` work this way:
+
+```bash
+export TMUX_AGENT_SOCKET=$(tmux display-message -p '#{socket_path}')
+tmux-agent list   # works without $TMUX if the server is reachable
+```
+
 **`tmux-agent` does NOT create sessions or split panes.** To open a new pane, use raw tmux:
 
 ```bash
-tmux split-window -h          # new pane, horizontal split (current session)
-tmux split-window -v          # new pane, vertical split
-tmux new-window               # new window in current session
-```
-
-After splitting, label the new pane and use tmux-agent normally:
-
-```bash
-NEW_PANE=$(tmux display-message -p '#{pane_id}')   # capture ID of the pane you just created
+# Split and capture the new pane ID in one step:
+NEW_PANE=$(tmux split-window -h -PF '#{pane_id}')
 tmux-agent name "$NEW_PANE" worker
 tmux-agent send worker "hello"
 ```

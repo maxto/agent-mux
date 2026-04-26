@@ -29,18 +29,18 @@ Large handoffs between agents no longer inflate the prompt. When a payload excee
 ## Quickstart
 
 ```bash
-# 0. Start a tmux session (required — tmux-agent only works inside tmux)
-tmux new-session -s agents
-
-# 1. Install global tools — once per machine
+# 1. Install global tools — once per machine (also installs tmux if missing)
 curl -fsSL https://maxto.github.io/agent-mux/install.sh | bash
 source ~/.bashrc   # or open a new terminal
 
-# 2. Install the skill — once per project
+# 2. Start a tmux session (tmux-agent only works inside tmux)
+tmux new-session -s agents
+
+# 3. Install the skill — once per project
 cd your-project
 agent-mux install
 
-# 3. In Claude Code, load the skill
+# 4. In Claude Code, load the skill
 /agent-mux
 ```
 
