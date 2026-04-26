@@ -29,6 +29,9 @@ Large handoffs between agents no longer inflate the prompt. When a payload excee
 ## Quickstart
 
 ```bash
+# 0. Start a tmux session (required — tmux-agent only works inside tmux)
+tmux new-session -s agents
+
 # 1. Install global tools — once per machine
 curl -fsSL https://maxto.github.io/agent-mux/install.sh | bash
 source ~/.bashrc   # or open a new terminal

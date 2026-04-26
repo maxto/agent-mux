@@ -9,6 +9,36 @@ metadata:
 
 Tmux pane control and cross-pane agent communication. Use `tmux-agent` (the high-level CLI) for all cross-pane interactions. Fall back to raw tmux commands only when you need low-level control.
 
+## Prerequisites
+
+`tmux-agent` requires running **inside an active tmux session** (`$TMUX` must be set). Check first:
+
+```bash
+[ -n "$TMUX" ] && echo "in tmux ✓" || echo "NOT in tmux — tmux-agent will not work"
+```
+
+**If you are NOT in tmux:** ask the user to start a tmux session, then re-launch the agent from inside it:
+
+```bash
+tmux new-session -s agents   # starts tmux and attaches; launch your agent from here
+```
+
+**`tmux-agent` does NOT create sessions or split panes.** To open a new pane, use raw tmux:
+
+```bash
+tmux split-window -h          # new pane, horizontal split (current session)
+tmux split-window -v          # new pane, vertical split
+tmux new-window               # new window in current session
+```
+
+After splitting, label the new pane and use tmux-agent normally:
+
+```bash
+NEW_PANE=$(tmux display-message -p '#{pane_id}')   # capture ID of the pane you just created
+tmux-agent name "$NEW_PANE" worker
+tmux-agent send worker "hello"
+```
+
 ## tmux-agent — Cross-Pane Communication
 
 A CLI that lets any AI agent interact with any other tmux pane. Works via plain bash. Every command is **atomic**: `type` types text (no Enter), `keys` sends special keys, `read` captures pane content.
