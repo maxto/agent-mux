@@ -74,7 +74,7 @@ Any agent can fill any role. Claude Code, Codex, Gemini, Qwen, DeepSeek, aider, 
 
 ### Coordination durability
 
-agent-mux does not provide hidden long-term memory or automatic RAG. The durable state is the installed skill plus explicit files in your project. When chats get long or an agent starts skipping coordination steps, reload the skill and follow its coordination contract:
+agent-mux does not provide long-term memory or automatic RAG. The durable state is the installed skill plus explicit files in your project. When chats get long or an agent starts skipping coordination steps, reload the skill and follow its coordination contract:
 
 - reply to `[tmux-agent v1 ... reply=<pane>]` messages with `tmux-agent send <pane> ...`
 - use `tmux-agent send` for normal agent handoffs because it types, verifies, and presses Enter

@@ -16,7 +16,7 @@ Follow this contract for every multi-agent task, especially after long chats or 
 1. If you receive a `[tmux-agent v1 ... reply=<pane>]` message, answer with `tmux-agent send <pane> '...'` or `tmux-agent send --file <pane> '...'`.
 2. When you delegate work, use `tmux-agent send <target> '...'`. It performs read -> message -> verify -> Enter automatically.
 3. If you use the manual cycle, always finish with `tmux-agent keys <target> Enter` after verifying the typed message.
-4. Put agent coordination in your plan when more than one pane is involved: list who owns implementation, review, testing, or follow-up.
+4. When more than one pane is involved, state in your initial response or reasoning who owns implementation, review, testing, and follow-up before acting.
 5. Do not wait or poll an agent pane for a reply. The other agent replies directly to your pane using the `reply=` pane ID.
 6. Before finalizing, account for delegated work: integrate worker results, mention unanswered requests, and report what was tested or not tested.
 
