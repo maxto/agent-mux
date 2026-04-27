@@ -82,6 +82,12 @@ Handles macOS `/tmp` → `/private/tmp` symlink transparently.
 
 Detects OS/package manager → installs tmux if missing → downloads `tmux-agent` and `agent-mux` CLI → adds `~/.agent-mux/bin` to shell rc. With `--with-config`: additionally backs up existing config to `~/.agent-mux/backups/`, downloads `.tmux.conf`, symlinks it to `~/.config/tmux/tmux.conf`, and reloads tmux if running.
 
+## Editing Guidelines
+
+- Touch only what the task requires. Don't improve adjacent code, comments, or formatting.
+- When your changes make something unused (import, variable, function), remove it. Don't remove pre-existing dead code — mention it instead.
+- No features, abstractions, or error handling beyond what was asked. If a simpler approach exists, say so before implementing.
+
 ## Key Design Constraints
 
 - `type` uses tmux's `-l` (literal) flag — no shell expansion of `$`, quotes, etc.
