@@ -200,7 +200,9 @@ A CLI to send text to any tmux pane — without copy-paste. Works from your shel
 | `tmux-agent type <target> <text>` | Type text into a pane without pressing Enter |
 | `tmux-agent keys <target> <key>...` | Send one or more special keys (Enter, Escape, C-c…) |
 | `tmux-agent message <target> <text>` | Like `type`, but prepends sender info automatically (no Enter) |
+| `tmux-agent thread stat <id>` | Show thread message count and byte size |
 | `tmux-agent thread read <id> [--since-cursor]` | Read thread messages (all or since last cursor) |
+| `tmux-agent thread read <id> --head N\|--tail N\|--bytes N` | Preview part of a thread without advancing the cursor |
 | `tmux-agent thread gc [--ttl <sec>]` | Remove old threads (default TTL: 3600s) |
 | `tmux-agent resolve <label>` | Get the pane ID for a label |
 | `tmux-agent id` | Print your own pane ID |
@@ -270,6 +272,8 @@ At this point, the receiver can choose:
 
 The receiver reads the thread only when needed:
 ```bash
+tmux-agent thread stat 20260424T101530Z-1a2b3c4d
+tmux-agent thread read 20260424T101530Z-1a2b3c4d --head 80
 tmux-agent thread read 20260424T101530Z-1a2b3c4d --since-cursor
 ```
 

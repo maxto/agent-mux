@@ -95,7 +95,9 @@ error: must read the pane before interacting. Run: tmux-agent read codex
 | `tmux-agent id` | Print this pane's ID | `tmux-agent id` |
 | `tmux-agent doctor` | Diagnose tmux connectivity issues | `tmux-agent doctor` |
 | `tmux-agent version` | Print version | `tmux-agent version` |
+| `tmux-agent thread stat <id>` | Show thread message count and byte size | `tmux-agent thread stat abc123` |
 | `tmux-agent thread read <id> [--since-cursor]` | Read thread messages (all or since last cursor) | `tmux-agent thread read abc123 --since-cursor` |
+| `tmux-agent thread read <id> --head N\|--tail N\|--bytes N` | Preview a thread without advancing the cursor | `tmux-agent thread read abc123 --head 80` |
 | `tmux-agent thread gc [--ttl <sec>]` | Remove old threads (default TTL: 3600s) | `tmux-agent thread gc --ttl 7200` |
 
 ### Target Resolution
@@ -163,7 +165,7 @@ For payloads over 2KB, use file-based transport. The pane receives only a compac
 **Manual force:** `send --file` always uses file transport. Use `send --path` to pass a file directly — avoids shell ARG_MAX limits.
 
 ```bash
-# Sender — send --path reads the file itself; no shell expansion needed
+# Sender — send --path reads the file directly; no shell expansion needed
 tmux-agent send --path codex large-diff.txt
 # → prints: thread: 20260424T101530Z-1a2b3c4d
 ```
@@ -177,6 +179,10 @@ tmux-agent send --path codex large-diff.txt
 ```bash
 # Read all messages in the thread
 tmux-agent thread read 20260424T101530Z-1a2b3c4d
+
+# Preview before loading a large thread into context
+tmux-agent thread stat 20260424T101530Z-1a2b3c4d
+tmux-agent thread read 20260424T101530Z-1a2b3c4d --head 80
 
 # Read only messages since last read (uses per-pane cursor)
 tmux-agent thread read 20260424T101530Z-1a2b3c4d --since-cursor

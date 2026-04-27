@@ -68,6 +68,9 @@ error: must read the pane before interacting. Run: tmux-agent read codex
 | `tmux-agent name <target> <label>` | Label a pane (visible in tmux border) | `tmux-agent name %3 codex` |
 | `tmux-agent resolve <label>` | Print pane target for a label | `tmux-agent resolve codex` |
 | `tmux-agent id` | Print this pane's ID | `tmux-agent id` |
+| `tmux-agent thread stat <id>` | Show thread message count and byte size | `tmux-agent thread stat abc123` |
+| `tmux-agent thread read <id> [--since-cursor]` | Read thread messages | `tmux-agent thread read abc123 --since-cursor` |
+| `tmux-agent thread read <id> --head N\|--tail N\|--bytes N` | Preview a thread without advancing the cursor | `tmux-agent thread read abc123 --head 80` |
 
 ## Target Resolution
 

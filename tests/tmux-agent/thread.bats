@@ -124,6 +124,72 @@ teardown() {
   [ "$TMP_COUNT" -eq 0 ]
 }
 
+@test "thread stat: reports message count, byte size, and manifest metadata" {
+  TDIR=$(make_thread "t-stat")
+  printf '{"id":"t-stat","created":"2026-01-01T00:00:00Z","from":"alice"}\n' > "${TDIR}/manifest.json"
+  printf 'abc' > "${TDIR}/messages/000001.md"
+  printf 'defg' > "${TDIR}/messages/000002.md"
+
+  run bash "$TMUX_AGENT" thread stat "t-stat"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"id: t-stat"* ]]
+  [[ "$output" == *"messages: 2"* ]]
+  [[ "$output" == *"bytes: 7"* ]]
+  [[ "$output" == *"from: alice"* ]]
+  [[ "$output" == *"created: 2026-01-01T00:00:00Z"* ]]
+}
+
+@test "thread read: --head returns only first N lines and does not advance cursor" {
+  TDIR=$(make_thread "t-head")
+  printf 'one\ntwo\nthree\n' > "${TDIR}/messages/000001.md"
+  printf 'four\n' > "${TDIR}/messages/000002.md"
+
+  run bash "$TMUX_AGENT" thread read "t-head" --head 2
+  [ "$status" -eq 0 ]
+  [[ "$output" == $'one\ntwo' ]]
+  [ ! -f "$(cursor_file_for "t-head")" ]
+}
+
+@test "thread read: --tail returns only last N lines and does not advance cursor" {
+  TDIR=$(make_thread "t-tail")
+  printf 'one\ntwo\nthree\n' > "${TDIR}/messages/000001.md"
+  printf 'four\n' > "${TDIR}/messages/000002.md"
+
+  run bash "$TMUX_AGENT" thread read "t-tail" --tail 2
+  [ "$status" -eq 0 ]
+  [[ "$output" == $'three\nfour' ]]
+  [ ! -f "$(cursor_file_for "t-tail")" ]
+}
+
+@test "thread read: --bytes returns only first N bytes and does not advance cursor" {
+  TDIR=$(make_thread "t-bytes")
+  printf 'abcdef' > "${TDIR}/messages/000001.md"
+  printf 'ghij' > "${TDIR}/messages/000002.md"
+
+  run bash "$TMUX_AGENT" thread read "t-bytes" --bytes 5
+  [ "$status" -eq 0 ]
+  [ "$output" = "abcde" ]
+  [ ! -f "$(cursor_file_for "t-bytes")" ]
+}
+
+@test "thread read: partial modes are mutually exclusive" {
+  TDIR=$(make_thread "t-partial-exclusive")
+  printf 'msg' > "${TDIR}/messages/000001.md"
+
+  run bash "$TMUX_AGENT" thread read "t-partial-exclusive" --head 1 --tail 1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"only one of"* ]]
+}
+
+@test "thread read: --since-cursor cannot combine with partial modes" {
+  TDIR=$(make_thread "t-partial-since")
+  printf 'msg' > "${TDIR}/messages/000001.md"
+
+  run bash "$TMUX_AGENT" thread read "t-partial-since" --since-cursor --bytes 1
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"cannot be combined"* ]]
+}
+
 # ── thread gc ────────────────────────────────────────────────────────────────
 
 @test "thread gc: exits cleanly when no threads directory exists" {

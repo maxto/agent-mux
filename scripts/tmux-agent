@@ -3,7 +3,7 @@
 # Any tool that can run bash can use this to talk to other panes.
 set -euo pipefail
 
-VERSION="1.3.1"
+VERSION="1.4.0"
 
 # --- Helpers ---
 
@@ -56,6 +56,10 @@ cursor_base() {
 
 file_mtime() {
   stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo 0
+}
+
+file_size() {
+  stat -c %s "$1" 2>/dev/null || stat -f %z "$1" 2>/dev/null || echo 0
 }
 
 acquire_lock() {
@@ -227,7 +231,9 @@ Commands:
   send --file <target> <text>              File-based transport (auto if payload >2KB)
   send --path <target> <file>              File-based transport, streams bytes from <file>
                                            (preserves trailing newlines and binary content)
+  thread stat <id>                         Show thread message count and byte size
   thread read <id> [--since-cursor]        Read thread messages (all or since cursor)
+  thread read <id> --head N|--tail N|--bytes N
   thread gc [--ttl <sec>]                  Remove old threads (default TTL: 3600s)
 
 Target resolution:
@@ -271,12 +277,17 @@ resolve_target() {
 
 resolve_label() {
   local label="$1"
-  local result
-  result=$(tmx list-panes -a -F '#{pane_id} #{@name}' 2>/dev/null \
-    | awk -v lbl="$label" '$2 == lbl { print $1; exit }')
-  if [[ -z "$result" ]]; then
+  local matches count result
+  matches=$(tmx list-panes -a -F '#{pane_id} #{@name}' 2>/dev/null \
+    | awk -v lbl="$label" '$2 == lbl { print $1 }')
+  if [[ -z "$matches" ]]; then
     die "no pane found with label '$label'"
   fi
+  count=$(printf '%s\n' "$matches" | wc -l | tr -d ' ')
+  if (( count > 1 )); then
+    die "label '$label' is ambiguous; matching panes: $(printf '%s' "$matches" | tr '\n' ' ')"
+  fi
+  result="$matches"
   echo "$result"
 }
 
@@ -600,24 +611,68 @@ cmd_thread() {
   shift || true
   case "$subcmd" in
     read) cmd_thread_read "$@" ;;
+    stat) cmd_thread_stat "$@" ;;
     gc)   cmd_thread_gc "$@" ;;
-    "")   die "thread requires a subcommand: read, gc" ;;
-    *)    die "unknown thread subcommand: $subcmd. Use: read, gc" ;;
+    "")   die "thread requires a subcommand: read, stat, gc" ;;
+    *)    die "unknown thread subcommand: $subcmd. Use: read, stat, gc" ;;
   esac
+}
+
+require_nonnegative_integer() {
+  local value="$1" name="$2"
+  [[ "$value" =~ ^[0-9]+$ ]] || die "$name must be a non-negative integer, got: ${value:-<empty>}"
+}
+
+cmd_thread_stat() {
+  require_args 1 $# "thread stat"
+  local thread_id="$1" tdir manifest count=0 bytes=0 from="" created=""
+  tdir="$(thread_base)/${thread_id}"
+  [[ -d "${tdir}/messages" ]] || die "thread not found: $thread_id"
+
+  manifest="${tdir}/manifest.json"
+  if [[ -f "$manifest" ]]; then
+    from=$(sed -n 's/.*"from":"\([^"]*\)".*/\1/p' "$manifest" | head -1)
+    created=$(sed -n 's/.*"created":"\([^"]*\)".*/\1/p' "$manifest" | head -1)
+  fi
+
+  local msg
+  for msg in "${tdir}/messages/"*.md; do
+    [[ -f "$msg" ]] || continue
+    (( count++ )) || true
+    bytes=$(( bytes + $(file_size "$msg") ))
+  done
+
+  echo "id: $thread_id"
+  echo "messages: $count"
+  echo "bytes: $bytes"
+  [[ -n "$from" ]] && echo "from: $from"
+  [[ -n "$created" ]] && echo "created: $created"
 }
 
 cmd_thread_read() {
   require_args 1 $# "thread read"
   local thread_id="$1"
   local since_cursor=false
+  local limit_mode="" limit_value=""
   shift
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --since-cursor) since_cursor=true ;;
+      --head|--tail|--bytes)
+        [[ -z "$limit_mode" ]] || die "only one of --head, --tail, or --bytes may be used"
+        limit_mode="${1#--}"
+        shift
+        [[ $# -gt 0 ]] || die "--${limit_mode} requires a value"
+        require_nonnegative_integer "$1" "--${limit_mode}"
+        limit_value="$1"
+        ;;
       *) die "unknown option: $1" ;;
     esac
     shift
   done
+  if [[ -n "$limit_mode" ]] && $since_cursor; then
+    die "--since-cursor cannot be combined with --head, --tail, or --bytes"
+  fi
 
   local tdir
   tdir="$(thread_base)/${thread_id}"
@@ -635,15 +690,30 @@ cmd_thread_read() {
   fi
 
   local last_seq=0
+  local msg_files=()
   for msg_file in "${tdir}/messages/"*.md; do
     [[ -f "$msg_file" ]] || continue
     local seq
     seq=$(basename "$msg_file" .md)
     if (( 10#$seq >= start_seq )); then
-      cat "$msg_file"
+      msg_files+=("$msg_file")
       last_seq=$(( 10#$seq ))
     fi
   done
+
+  if [[ -n "$limit_mode" ]]; then
+    (( ${#msg_files[@]} > 0 )) || return 0
+    case "$limit_mode" in
+      head)  ( set +o pipefail; cat "${msg_files[@]}" | head -n "$limit_value" ) ;;
+      tail)  cat "${msg_files[@]}" | tail -n "$limit_value" ;;
+      bytes) ( set +o pipefail; cat "${msg_files[@]}" | head -c "$limit_value" ) ;;
+    esac
+    return 0
+  fi
+
+  if (( ${#msg_files[@]} > 0 )); then
+    cat "${msg_files[@]}"
+  fi
 
   if (( last_seq > 0 )); then
     local tmp

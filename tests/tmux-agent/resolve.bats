@@ -48,6 +48,18 @@ teardown() {
   [[ "$output" == *"no pane found"* ]]
 }
 
+@test "resolve fails clearly for duplicate labels" {
+  SECOND_PANE=$(tmux -S "$SOCKET" split-window -h -t test -PF '#{pane_id}')
+  bash "$TMUX_AGENT" name "$TEST_PANE" duplicate
+  bash "$TMUX_AGENT" name "$SECOND_PANE" duplicate
+
+  run bash "$TMUX_AGENT" resolve duplicate
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"ambiguous"* ]]
+  [[ "$output" == *"$TEST_PANE"* ]]
+  [[ "$output" == *"$SECOND_PANE"* ]]
+}
+
 @test "type accepts label as target" {
   bash "$TMUX_AGENT" name "$TEST_PANE" typetarget
   bash "$TMUX_AGENT" read typetarget
