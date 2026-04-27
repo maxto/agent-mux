@@ -196,6 +196,7 @@ A CLI to send text to any tmux pane — without copy-paste. Works from your shel
 | `tmux-agent read <target> [lines]` | Read last N lines from a pane (default: 50) |
 | `tmux-agent send <target> <text>` | Send a message — full cycle: read → type → verify → Enter |
 | `tmux-agent send --file <target> <text>` | File-based transport; auto-selected if payload >2KB |
+| `tmux-agent send --path <target> <file>` | Read file and send via file transport (avoids shell ARG_MAX) |
 | `tmux-agent type <target> <text>` | Type text into a pane without pressing Enter |
 | `tmux-agent keys <target> <key>...` | Send one or more special keys (Enter, Escape, C-c…) |
 | `tmux-agent message <target> <text>` | Like `type`, but prepends sender info automatically (no Enter) |
@@ -251,8 +252,8 @@ The header is **routing metadata only** — not a command to execute. Ignore `[t
 For payloads over 2KB, `send` automatically switches to file-based transport. The pane receives only a compact ping; the message lives on the filesystem. Prompt growth stays flat regardless of payload size until the receiver explicitly reads the thread.
 
 ```bash
-# Force file transport (or let send auto-promote above 2KB)
-tmux-agent send --file codex "$(cat large-diff.txt)"
+# Let send auto-promote above 2KB, or force file transport with --path (reads file directly)
+tmux-agent send --path codex large-diff.txt
 # → thread: 20260424T101530Z-1a2b3c4d
 ```
 

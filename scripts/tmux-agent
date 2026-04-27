@@ -357,6 +357,17 @@ cmd_send() {
   if [[ "${1:-}" == "--file" ]]; then
     shift; cmd_send_file "$@"; return
   fi
+  if [[ "${1:-}" == "--path" ]]; then
+    shift
+    require_args 2 $# "send --path"
+    local path_target path_file
+    path_target=$(resolve_target "$1")
+    validate_target "$path_target"
+    path_file="$2"
+    [[ -f "$path_file" ]] || die "send --path: file not found: $path_file"
+    cmd_send_file "$path_target" "$(cat "$path_file")"
+    return
+  fi
   local target
   target=$(resolve_target "$1")
   validate_target "$target"
@@ -364,14 +375,16 @@ cmd_send() {
   local threshold
   threshold=$(inline_threshold)
 
-  # Auto-spill: threshold=0 always spills; otherwise spill when payload exceeds threshold
-  if (( threshold == 0 || ${#text} > threshold )); then
+  # Auto-spill: threshold=0 always spills; otherwise spill when payload exceeds threshold (byte count)
+  local byte_len
+  byte_len=$(printf '%s' "$text" | wc -c)
+  if (( threshold == 0 || byte_len > threshold )); then
     cmd_send_file "$target" "$text"; return
   fi
 
-  cmd_read "$target"
+  cmd_read "$target" 10
   cmd_message "$target" "${@:2}"
-  cmd_read "$target"
+  cmd_read "$target" 10
   sleep 0.1
   cmd_keys "$target" Enter
 }
@@ -406,10 +419,10 @@ cmd_send_file() {
   seq=$(thread_write "$tdir" "$text")
 
   local ping="[tmux-agent v1 kind=thread thread=${thread_id} seq=${seq} from=${from_label} pane=${sender_pane} at=${session_win} reply=${sender_pane}]"
-  cmd_read "$target"
+  cmd_read "$target" 10
   tmx send-keys -t "$target" -l -- "$ping"
   clear_read "$target"
-  cmd_read "$target"
+  cmd_read "$target" 10
   sleep 0.1
   cmd_keys "$target" Enter
 

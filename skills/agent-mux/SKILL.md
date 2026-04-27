@@ -85,7 +85,8 @@ error: must read the pane before interacting. Run: tmux-agent read codex
 | `tmux-agent list` | Show all panes with target, pid, command, size, label | `tmux-agent list` |
 | `tmux-agent type <target> <text>` | Type text without pressing Enter | `tmux-agent type codex "hello"` |
 | `tmux-agent send <target> <text>` | Read, send message, verify, and press Enter (full cycle) | `tmux-agent send codex "review src/auth.ts"` |
-| `tmux-agent send --file <target> <text>` | File-based transport; auto-selected if payload >2KB | `tmux-agent send --file codex "$(cat big.log)"` |
+| `tmux-agent send --file <target> <text>` | File-based transport; auto-selected if payload >2KB | `tmux-agent send --file codex "large text"` |
+| `tmux-agent send --path <target> <file>` | Read file and send via file transport (avoids shell ARG_MAX) | `tmux-agent send --path codex big.log` |
 | `tmux-agent message <target> <text>` | Type text with auto sender info and reply target | `tmux-agent message codex "review src/auth.ts"` |
 | `tmux-agent read <target> [lines]` | Read last N lines (default 50) | `tmux-agent read codex` |
 | `tmux-agent keys <target> <key>...` | Send special keys | `tmux-agent keys codex Enter` |
@@ -159,11 +160,11 @@ For payloads over 2KB, use file-based transport. The pane receives only a compac
 
 **Auto-spill (transparent):** `send` promotes to file transport automatically when text exceeds 2KB.
 
-**Manual force:** `send --file` always uses file transport.
+**Manual force:** `send --file` always uses file transport. Use `send --path` to pass a file directly — avoids shell ARG_MAX limits.
 
 ```bash
-# Sender — works exactly like send; returns a thread ID
-tmux-agent send --file codex "$(cat large-diff.txt)"
+# Sender — send --path reads the file itself; no shell expansion needed
+tmux-agent send --path codex large-diff.txt
 # → prints: thread: 20260424T101530Z-1a2b3c4d
 ```
 

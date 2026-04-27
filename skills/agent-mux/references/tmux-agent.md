@@ -6,7 +6,7 @@ Every command is **atomic**: `type` types text (no Enter), `keys` sends special 
 
 ## DO NOT WAIT OR POLL — EVER
 
-**Other panes have agents that will reply to you via tmux-agent.** When you send a message to another agent, their reply will appear directly in YOUR pane as a `[tmux-agent from:...]` message. You do NOT need to:
+**Other panes have agents that will reply to you via tmux-agent.** When you send a message to another agent, their reply will appear directly in YOUR pane as a `[tmux-agent v1 ...]` message. You do NOT need to:
 
 - Sleep or wait after sending
 - Poll the target pane for a response
@@ -60,6 +60,8 @@ error: must read the pane before interacting. Run: tmux-agent read codex
 | `tmux-agent list` | Show all panes with target, pid, command, size, label | `tmux-agent list` |
 | `tmux-agent type <target> <text>` | Type text without pressing Enter | `tmux-agent type codex "hello"` |
 | `tmux-agent send <target> <text>` | Read, send message, verify, and press Enter (full cycle) | `tmux-agent send codex "review src/auth.ts"` |
+| `tmux-agent send --file <target> <text>` | File-based transport; auto-selected if payload >2KB | `tmux-agent send --file codex "large text"` |
+| `tmux-agent send --path <target> <file>` | Read file and send via file transport (avoids shell ARG_MAX) | `tmux-agent send --path codex large-diff.txt` |
 | `tmux-agent message <target> <text>` | Type text with auto sender info and reply target | `tmux-agent message codex "review src/auth.ts"` |
 | `tmux-agent read <target> [lines]` | Read last N lines (default 50) | `tmux-agent read codex 100` |
 | `tmux-agent keys <target> <key>...` | Send special keys | `tmux-agent keys codex Enter` |
@@ -77,28 +79,23 @@ This means `tmux-agent type codex "hello"` works directly if the pane was labele
 
 ## Messaging Convention
 
-The `message` command auto-prepends sender info and location:
+The `message` command auto-prepends routing metadata as a compact header:
 
 ```
-[tmux-agent from:claude pane:%4 at:3:0.0] Please review src/auth.ts
+[tmux-agent v1 from=claude pane=%4 at=agents:0.0 msg=20260427T120102Z-1a2b3c4d reply=%4] Please review src/auth.ts
 ```
 
-The receiver gets: who sent it (`from`), the exact pane to reply to (`pane`), and the session/window location (`at`). When you see this header, reply using tmux-agent to the pane ID from the header.
+Fields: `from` (label or pane ID of sender), `pane` (sender's pane ID), `at` (session:window.pane), `msg` (unique message ID), `reply` (pane to send your response to).
 
 ### Receiving messages — IMPORTANT
 
-**When you see a message with a `[tmux-agent from:... pane:%N ...]` header, reply to the pane ID from the header:**
+**When you see a `[tmux-agent v1 ... reply=<pane>]` header, reply to the pane ID in `reply=`:**
 
 ```bash
-tmux-agent read %4 20
-tmux-agent message %4 "your response here"
-tmux-agent read %4 20
-tmux-agent keys %4 Enter
+tmux-agent send %4 'your response here'
 ```
 
-This sends your reply directly into the sender's pane so they see it immediately. **Do not just respond in your own pane** — the sender won't see it unless you send it back via tmux-agent.
-
-Keep replies concise (1-3 sentences). They will be typed into the sender's terminal as a single line.
+Use `send --file` if your reply is large. **Do not just respond in your own pane** — the sender won't see it unless you send it back via tmux-agent.
 
 ### Example conversation
 
@@ -111,10 +108,10 @@ tmux-agent send codex 'What is the test coverage for src/auth.ts?'
 
 **Agent B (codex) sees in their prompt:**
 ```
-[tmux-agent from:claude pane:%4 at:3:0.0] What is the test coverage for src/auth.ts?
+[tmux-agent v1 from=claude pane=%4 at=agents:0.0 msg=20260427T120102Z-1a2b3c4d reply=%4] What is the test coverage for src/auth.ts?
 ```
 
-**Agent B replies using the pane ID from the header:**
+**Agent B replies using the pane ID from `reply=`:**
 ```bash
 tmux-agent send %4 '87% line coverage. Missing the OAuth refresh token path (lines 142-168).'
 # Done. The reply appears in Agent A's pane automatically.
@@ -134,21 +131,28 @@ The full cycle for sending a message:
 
 ### Example: sending a message to an agent
 
+Prefer `send` — it runs the full cycle automatically:
+
+```bash
+tmux-agent send codex 'Please review the changes in src/auth.ts'
+# STOP. Do NOT read codex to check for a reply.
+# The other agent will reply via tmux-agent into YOUR pane.
+```
+
+Manual cycle (when you need to inspect between steps):
+
 ```bash
 # 1. READ — check the pane and satisfy read guard
 tmux-agent read codex 20
 
-# 2. TYPE — type the message (no Enter)
-tmux-agent type codex '[tmux-agent from:claude] Please review the changes in src/auth.ts'
+# 2. MESSAGE — auto-prepends v1 header with reply target (no Enter)
+tmux-agent message codex 'Please review the changes in src/auth.ts'
 
 # 3. READ — verify the text landed correctly
 tmux-agent read codex 20
 
 # 4. KEYS — press Enter to submit
 tmux-agent keys codex Enter
-
-# STOP. Do NOT read codex to check for a reply.
-# The other agent will reply via tmux-agent into YOUR pane.
 ```
 
 ### Example: approving a prompt (non-agent pane)
