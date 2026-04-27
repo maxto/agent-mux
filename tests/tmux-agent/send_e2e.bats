@@ -91,3 +91,49 @@ make_payload() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"thread: "* ]]
 }
+
+# ── --path streams bytes from disk (preserves trailing newlines) ──────────────
+
+@test "send --path: thread message is byte-exact copy of source file (trailing newlines preserved)" {
+  PAYLOAD_FILE="$BATS_TMPDIR/payload-path-$$"
+  printf 'line1\nline2\n\n\n' > "$PAYLOAD_FILE"
+  ORIG_BYTES=$(wc -c < "$PAYLOAD_FILE")
+
+  run bash "$TMUX_AGENT" send --path "$TARGET_PANE" "$PAYLOAD_FILE"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"thread: "* ]]
+
+  THREAD_ID=$(printf '%s' "$output" | sed -n 's/^thread: //p')
+  THREAD_FILE="$XDG_RUNTIME_DIR/threads/$THREAD_ID/messages/000001.md"
+  [ -f "$THREAD_FILE" ]
+  COPIED_BYTES=$(wc -c < "$THREAD_FILE")
+  [ "$ORIG_BYTES" = "$COPIED_BYTES" ]
+  cmp "$PAYLOAD_FILE" "$THREAD_FILE"
+
+  rm -f "$PAYLOAD_FILE"
+}
+
+@test "send --path: fails with clear error when file does not exist" {
+  run bash "$TMUX_AGENT" send --path "$TARGET_PANE" "/nonexistent-path-$$.dat"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"file not found"* ]]
+}
+
+# ── byte-count threshold honours UTF-8 (multibyte) payloads ───────────────────
+
+@test "send: threshold uses byte count, not char count — UTF-8 multibyte payload spills" {
+  # 800 rocket emojis = 800 chars but 3200 bytes (4 bytes each in UTF-8).
+  # Default threshold is 2048 bytes → must spill to file transport.
+  PAYLOAD=$(python3 -c "import sys; sys.stdout.write('🚀' * 800)")
+  run bash "$TMUX_AGENT" send "$TARGET_PANE" "$PAYLOAD"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"thread: "* ]]
+}
+
+@test "send: threshold uses byte count, not char count — UTF-8 char count alone stays inline" {
+  # 500 chars, but each emoji is 4 bytes → 2000 bytes < 2048 threshold → inline.
+  PAYLOAD=$(python3 -c "import sys; sys.stdout.write('🚀' * 500)")
+  run bash "$TMUX_AGENT" send "$TARGET_PANE" "$PAYLOAD"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"thread: "* ]]
+}

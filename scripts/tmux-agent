@@ -3,7 +3,7 @@
 # Any tool that can run bash can use this to talk to other panes.
 set -euo pipefail
 
-VERSION="1.3.0"
+VERSION="1.3.1"
 
 # --- Helpers ---
 
@@ -104,6 +104,19 @@ thread_write() {
   seq=$(next_seq "$tdir")
   tmp=$(mktemp "${tdir}/messages/.msg-XXXXXX")
   printf '%s' "$text" > "$tmp"
+  mv "$tmp" "${tdir}/messages/${seq}.md"
+  release_lock "$tdir"
+  echo "$seq"
+}
+
+# Like thread_write but copies bytes from a source file — preserves trailing
+# newlines and binary content that command substitution would strip.
+thread_write_file() {
+  local tdir="$1" src="$2" tmp seq
+  acquire_lock "$tdir"
+  seq=$(next_seq "$tdir")
+  tmp=$(mktemp "${tdir}/messages/.msg-XXXXXX")
+  cat -- "$src" > "$tmp"
   mv "$tmp" "${tdir}/messages/${seq}.md"
   release_lock "$tdir"
   echo "$seq"
@@ -212,6 +225,8 @@ Commands:
   version                   Print version
 
   send --file <target> <text>              File-based transport (auto if payload >2KB)
+  send --path <target> <file>              File-based transport, streams bytes from <file>
+                                           (preserves trailing newlines and binary content)
   thread read <id> [--since-cursor]        Read thread messages (all or since cursor)
   thread gc [--ttl <sec>]                  Remove old threads (default TTL: 3600s)
 
@@ -365,7 +380,7 @@ cmd_send() {
     validate_target "$path_target"
     path_file="$2"
     [[ -f "$path_file" ]] || die "send --path: file not found: $path_file"
-    cmd_send_file "$path_target" "$(cat "$path_file")"
+    _send_thread "$path_target" file "$path_file"
     return
   fi
   local target
@@ -382,9 +397,9 @@ cmd_send() {
     cmd_send_file "$target" "$text"; return
   fi
 
-  cmd_read "$target" 10
+  cmd_read "$target" 10 >/dev/null
   cmd_message "$target" "${@:2}"
-  cmd_read "$target" 10
+  cmd_read "$target" 10 >/dev/null
   sleep 0.1
   cmd_keys "$target" Enter
 }
@@ -395,7 +410,14 @@ cmd_send_file() {
   local target
   target=$(resolve_target "$1")
   validate_target "$target"
-  local text="${*:2}"
+  _send_thread "$target" text "${*:2}"
+}
+
+# Send a payload to a target via thread file transport.
+# kind=text → src is the literal payload string.
+# kind=file → src is a path; bytes are streamed via cat (preserves trailing newlines).
+_send_thread() {
+  local target="$1" kind="$2" src="$3"
 
   local sender_pane="${TMUX_PANE:-}"
   [[ -z "$sender_pane" ]] && die "not running inside a tmux pane (\$TMUX_PANE is unset)"
@@ -416,13 +438,17 @@ cmd_send_file() {
 
   # Write message atomically — ping is sent ONLY after successful write
   local seq
-  seq=$(thread_write "$tdir" "$text")
+  if [[ "$kind" == "file" ]]; then
+    seq=$(thread_write_file "$tdir" "$src")
+  else
+    seq=$(thread_write "$tdir" "$src")
+  fi
 
   local ping="[tmux-agent v1 kind=thread thread=${thread_id} seq=${seq} from=${from_label} pane=${sender_pane} at=${session_win} reply=${sender_pane}]"
-  cmd_read "$target" 10
+  cmd_read "$target" 10 >/dev/null
   tmx send-keys -t "$target" -l -- "$ping"
   clear_read "$target"
-  cmd_read "$target" 10
+  cmd_read "$target" 10 >/dev/null
   sleep 0.1
   cmd_keys "$target" Enter
 
