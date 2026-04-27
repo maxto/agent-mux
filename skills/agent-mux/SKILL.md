@@ -9,6 +9,19 @@ metadata:
 
 Tmux pane control and cross-pane agent communication. Use `tmux-agent` (the high-level CLI) for all cross-pane interactions. Fall back to raw tmux commands only when you need low-level control.
 
+## Coordination Contract
+
+Follow this contract for every multi-agent task, especially after long chats or context compaction:
+
+1. If you receive a `[tmux-agent v1 ... reply=<pane>]` message, answer with `tmux-agent send <pane> '...'` or `tmux-agent send --file <pane> '...'`.
+2. When you delegate work, use `tmux-agent send <target> '...'`. It performs read -> message -> verify -> Enter automatically.
+3. If you use the manual cycle, always finish with `tmux-agent keys <target> Enter` after verifying the typed message.
+4. Put agent coordination in your plan when more than one pane is involved: list who owns implementation, review, testing, or follow-up.
+5. Do not wait or poll an agent pane for a reply. The other agent replies directly to your pane using the `reply=` pane ID.
+6. Before finalizing, account for delegated work: integrate worker results, mention unanswered requests, and report what was tested or not tested.
+
+This skill is the durable protocol. If the chat is long, re-read this section before planning or replying to another agent.
+
 ## Prerequisites
 
 **Cross-pane send/reply workflows require running inside a tmux pane** (`$TMUX` must be set). Check first:
