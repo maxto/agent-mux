@@ -129,22 +129,23 @@ download() {
 
 install_skill() {
   local project_dir="$1"
+  local source_url="${2:-$BASE_URL}"
 
   # Neutral path — readable by any agent (Codex /init, Gemini @path, aider /add, etc.)
   local neutral_dir="$project_dir/skills/agent-mux"
   info "Installing agent-mux skill to ${neutral_dir/#$HOME/\~}..."
   mkdir -p "$neutral_dir/references"
-  download "$BASE_URL/skills/agent-mux/SKILL.md"                    "$neutral_dir/SKILL.md"
-  download "$BASE_URL/skills/agent-mux/references/tmux-agent.md"   "$neutral_dir/references/tmux-agent.md"
-  download "$BASE_URL/skills/agent-mux/references/tmux.md"          "$neutral_dir/references/tmux.md"
+  download "$source_url/skills/agent-mux/SKILL.md"                    "$neutral_dir/SKILL.md"
+  download "$source_url/skills/agent-mux/references/tmux-agent.md"   "$neutral_dir/references/tmux-agent.md"
+  download "$source_url/skills/agent-mux/references/tmux.md"          "$neutral_dir/references/tmux.md"
 
   # Claude Code path — enables /agent-mux slash command
   local claude_dir="$project_dir/.claude/skills/agent-mux"
   info "Installing Claude Code skill to ${claude_dir/#$HOME/\~}..."
   mkdir -p "$claude_dir/references"
-  download "$BASE_URL/skills/agent-mux/SKILL.md"                    "$claude_dir/SKILL.md"
-  download "$BASE_URL/skills/agent-mux/references/tmux-agent.md"   "$claude_dir/references/tmux-agent.md"
-  download "$BASE_URL/skills/agent-mux/references/tmux.md"          "$claude_dir/references/tmux.md"
+  download "$source_url/skills/agent-mux/SKILL.md"                    "$claude_dir/SKILL.md"
+  download "$source_url/skills/agent-mux/references/tmux-agent.md"   "$claude_dir/references/tmux-agent.md"
+  download "$source_url/skills/agent-mux/references/tmux.md"          "$claude_dir/references/tmux.md"
 }
 
 cmd_global_install() {
@@ -256,6 +257,7 @@ cmd_install() {
 
 cmd_update() {
   info "Updating agent-mux..."
+  local updated_version="$VERSION"
 
   mkdir -p "$SMUX_DIR" "$BIN_DIR"
   download "$MAIN_URL/help.txt" "$SMUX_DIR/help.txt"
@@ -266,12 +268,14 @@ cmd_update() {
 
   info "Updating agent-mux CLI..."
   download "$MAIN_URL/install.sh" "$BIN_DIR/agent-mux.tmp"
+  updated_version=$(sed -n 's/^VERSION="\([^"]*\)".*/\1/p' "$BIN_DIR/agent-mux.tmp" | head -1)
+  updated_version="${updated_version:-$VERSION}"
   mv "$BIN_DIR/agent-mux.tmp" "$BIN_DIR/agent-mux"
   chmod +x "$BIN_DIR/agent-mux"
 
   if [[ -d "$PWD/.claude/skills/agent-mux" ]] || [[ -d "$PWD/skills/agent-mux" ]]; then
     info "Updating agent-mux skill..."
-    install_skill "$PWD"
+    install_skill "$PWD" "$MAIN_URL"
   fi
 
   # Only update tmux config if user previously opted into --with-config
@@ -289,7 +293,7 @@ cmd_update() {
     fi
   fi
 
-  printf '%b\n' "${GREEN}${BOLD}agent-mux updated to v${VERSION}!${NC}"
+  printf '%b\n' "${GREEN}${BOLD}agent-mux updated to v${updated_version}!${NC}"
 }
 
 cmd_uninstall() {
