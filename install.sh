@@ -2,7 +2,7 @@
 # agent-mux — one-command tmux setup
 set -euo pipefail
 
-VERSION="1.5.0"
+VERSION="1.6.0"
 REPO="maxto/agent-mux"
 BRANCH="v${VERSION}"
 BASE_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
@@ -143,33 +143,58 @@ session_usage() {
 agent-mux session — bootstrap a tmux layout for multi-agent work
 
 Usage:
-  agent-mux session [start] [--name <session>] [--labels a,b,c]
+  agent-mux session [start] [--name <session>] [--labels a,b,c] [--cmds x,y,z]
+  agent-mux session list
+  agent-mux session kill --name <session>
 
 Defaults:
   --name agents
   --labels coordinator,worker1,worker2
 
 Behavior:
-  Inside tmux, run from the pane you want as coordinator; missing worker panes are created.
+  Labels may contain any number of panes. Commands are optional and must match label count.
+  --cmds is comma-separated; commands containing literal commas are not supported.
+  Inside tmux, run from the pane you want as the first label; missing panes are created.
   Outside tmux, creates the session if needed and attaches to it.
 EOF
 }
 
+SESSION_LABELS=()
+SESSION_CMDS=()
+SESSION_PANES=()
+
 parse_session_labels() {
   local raw="$1"
-  [[ "$raw" =~ ^[^,]+,[^,]+,[^,]+$ ]] || error "--labels requires exactly three comma-separated labels"
-  IFS=',' read -r SESSION_LABEL_1 SESSION_LABEL_2 SESSION_LABEL_3 SESSION_LABEL_EXTRA <<< "$raw"
+  [[ "$raw" =~ ^[^,]+(,[^,]+)*$ ]] || error "--labels requires one or more comma-separated labels"
+  SESSION_LABELS=()
 
-  if [[ -z "${SESSION_LABEL_1:-}" || -z "${SESSION_LABEL_2:-}" || -z "${SESSION_LABEL_3:-}" || -n "${SESSION_LABEL_EXTRA:-}" ]]; then
-    error "--labels requires exactly three comma-separated labels"
-  fi
+  local rest="$raw" label
+  while [[ "$rest" == *,* ]]; do
+    label="${rest%%,*}"
+    SESSION_LABELS+=("$label")
+    rest="${rest#*,}"
+  done
+  SESSION_LABELS+=("$rest")
 
-  local label
-  for label in "$SESSION_LABEL_1" "$SESSION_LABEL_2" "$SESSION_LABEL_3"; do
+  for label in "${SESSION_LABELS[@]}"; do
     if [[ ! "$label" =~ ^[A-Za-z0-9._-]+$ ]]; then
       error "invalid label '$label'. Use letters, numbers, dot, underscore, or dash."
     fi
   done
+}
+
+parse_session_cmds() {
+  local raw="$1"
+  [[ "$raw" =~ ^[^,]+(,[^,]+)*$ ]] || error "--cmds requires one or more comma-separated commands"
+  SESSION_CMDS=()
+
+  local rest="$raw" cmd
+  while [[ "$rest" == *,* ]]; do
+    cmd="${rest%%,*}"
+    SESSION_CMDS+=("$cmd")
+    rest="${rest#*,}"
+  done
+  SESSION_CMDS+=("$rest")
 }
 
 current_tmux_pane() {
@@ -188,69 +213,130 @@ label_pane() {
   tmux_cmd set-option -p -t "$pane" @name "$label" >/dev/null
 }
 
+launch_session_commands() {
+  (( ${#SESSION_CMDS[@]} == 0 )) && return
+
+  local i
+  for i in "${!SESSION_CMDS[@]}"; do
+    tmux_cmd send-keys -t "${SESSION_PANES[$i]}" -l -- "${SESSION_CMDS[$i]}"
+    tmux_cmd send-keys -t "${SESSION_PANES[$i]}" Enter
+  done
+}
+
+print_session_layout() {
+  local i
+  info "Session layout ready:"
+  for i in "${!SESSION_LABELS[@]}"; do
+    echo "  ${SESSION_LABELS[$i]}: ${SESSION_PANES[$i]}"
+  done
+}
+
 cmd_session_start_inside() {
   local current_pane="$1"
-  local current_window worker1 worker2
+  local current_window last_pane pane label i
   current_window=$(tmux_cmd display-message -t "$current_pane" -p '#{window_id}')
 
-  worker1=$(find_labeled_pane_in_window "$current_window" "$SESSION_LABEL_2")
-  worker2=$(find_labeled_pane_in_window "$current_window" "$SESSION_LABEL_3")
+  SESSION_PANES=()
+  last_pane="$current_pane"
 
-  label_pane "$current_pane" "$SESSION_LABEL_1"
+  for i in "${!SESSION_LABELS[@]}"; do
+    label="${SESSION_LABELS[$i]}"
+    if (( i == 0 )); then
+      pane="$current_pane"
+    else
+      pane=$(find_labeled_pane_in_window "$current_window" "$label")
+      if [[ -z "$pane" ]]; then
+        pane=$(tmux_cmd split-window -h -t "$last_pane" -PF '#{pane_id}')
+      fi
+    fi
 
-  if [[ -z "$worker1" ]]; then
-    worker1=$(tmux_cmd split-window -h -t "$current_pane" -PF '#{pane_id}')
-  fi
-  label_pane "$worker1" "$SESSION_LABEL_2"
-
-  if [[ -z "$worker2" ]]; then
-    worker2=$(tmux_cmd split-window -v -t "$worker1" -PF '#{pane_id}')
-  fi
-  label_pane "$worker2" "$SESSION_LABEL_3"
+    label_pane "$pane" "$label"
+    SESSION_PANES+=("$pane")
+    last_pane="$pane"
+  done
 
   tmux_cmd select-layout -t "$current_window" tiled >/dev/null 2>&1 || true
-
-  info "Session layout ready:"
-  echo "  $SESSION_LABEL_1: $current_pane"
-  echo "  $SESSION_LABEL_2: $worker1"
-  echo "  $SESSION_LABEL_3: $worker2"
+  launch_session_commands
+  print_session_layout
 }
 
 cmd_session_start_outside() {
   local session_name="$1"
   if tmux_cmd has-session -t "$session_name" 2>/dev/null; then
     info "Session '$session_name' already exists; attaching without modifying it."
-    echo "Run 'agent-mux session' inside tmux to apply the default labels if needed."
+    echo "Run 'agent-mux session start' inside tmux to apply labels if needed."
     tmux_cmd attach-session -t "$session_name"
     return
   fi
 
-  local coordinator worker1 worker2
-  coordinator=$(tmux_cmd new-session -d -s "$session_name" -n agents -PF '#{pane_id}')
-  worker1=$(tmux_cmd split-window -h -t "$coordinator" -PF '#{pane_id}')
-  worker2=$(tmux_cmd split-window -v -t "$worker1" -PF '#{pane_id}')
+  local pane last_pane i
+  SESSION_PANES=()
+  pane=$(tmux_cmd new-session -d -s "$session_name" -n agents -PF '#{pane_id}')
+  SESSION_PANES+=("$pane")
+  last_pane="$pane"
 
-  label_pane "$coordinator" "$SESSION_LABEL_1"
-  label_pane "$worker1" "$SESSION_LABEL_2"
-  label_pane "$worker2" "$SESSION_LABEL_3"
-  tmux_cmd select-layout -t "${session_name}:0" tiled >/dev/null 2>&1 || true
+  for i in "${!SESSION_LABELS[@]}"; do
+    if (( i == 0 )); then
+      pane="${SESSION_PANES[0]}"
+    else
+      pane=$(tmux_cmd split-window -h -t "$last_pane" -PF '#{pane_id}')
+      SESSION_PANES+=("$pane")
+    fi
+
+    label_pane "$pane" "${SESSION_LABELS[$i]}"
+    last_pane="$pane"
+  done
+  tmux_cmd select-layout -t "$session_name" tiled >/dev/null 2>&1 || true
+  launch_session_commands
+  print_session_layout
 
   info "Created tmux session '$session_name'."
   tmux_cmd attach-session -t "$session_name"
 }
 
-cmd_session() {
-  local subcmd="${1:-start}"
-  if [[ "$subcmd" == "help" || "$subcmd" == "--help" || "$subcmd" == "-h" ]]; then
-    session_usage
-    return
-  fi
-  if [[ "$subcmd" == "start" ]]; then
-    shift || true
-  fi
+cmd_session_list() {
+  require_tmux_binary
+  printf "%-24s %-8s %-8s\n" "SESSION" "WINDOWS" "ATTACHED"
+  local raw
+  raw=$(tmux_cmd list-sessions -F '#{session_name}|#{session_windows}|#{session_attached}' 2>/dev/null || true)
+  [[ -n "$raw" ]] || return 0
+  while IFS='|' read -r name windows attached; do
+    printf "%-24s %-8s %-8s\n" "$name" "$windows" "$attached"
+  done <<< "$raw"
+}
 
+cmd_session_kill() {
+  require_tmux_binary
+  local session_name=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --name)
+        shift
+        [[ $# -gt 0 ]] || error "--name requires a session name"
+        session_name="$1"
+        ;;
+      -*)
+        error "Unknown session kill option: $1. Run 'agent-mux session --help'."
+        ;;
+      *)
+        [[ -z "$session_name" ]] || error "session kill accepts only one session name"
+        session_name="$1"
+        ;;
+    esac
+    shift
+  done
+
+  [[ -n "$session_name" ]] || error "session kill requires --name <session>"
+  [[ "$session_name" =~ ^[A-Za-z0-9._-]+$ ]] || error "invalid session name '$session_name'"
+  tmux_cmd has-session -t "$session_name" 2>/dev/null || error "session not found: $session_name"
+  tmux_cmd kill-session -t "$session_name"
+  info "Killed tmux session '$session_name'."
+}
+
+cmd_session_start() {
   local session_name="agents"
   local labels="coordinator,worker1,worker2"
+  local cmds=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --name)
@@ -263,7 +349,12 @@ cmd_session() {
         [[ $# -gt 0 ]] || error "--labels requires a value"
         labels="$1"
         ;;
-      *) error "Unknown session option: $1. Run 'agent-mux session --help'." ;;
+      --cmds)
+        shift
+        [[ $# -gt 0 ]] || error "--cmds requires a value"
+        cmds="$1"
+        ;;
+      *) error "Unknown session start option: $1. Run 'agent-mux session --help'." ;;
     esac
     shift
   done
@@ -271,6 +362,11 @@ cmd_session() {
   [[ "$session_name" =~ ^[A-Za-z0-9._-]+$ ]] || error "invalid session name '$session_name'"
   require_tmux_binary
   parse_session_labels "$labels"
+  SESSION_CMDS=()
+  if [[ -n "$cmds" ]]; then
+    parse_session_cmds "$cmds"
+    (( ${#SESSION_CMDS[@]} == ${#SESSION_LABELS[@]} )) || error "--cmds count must match --labels count"
+  fi
 
   local current_pane
   if current_pane=$(current_tmux_pane); then
@@ -278,6 +374,27 @@ cmd_session() {
   else
     cmd_session_start_outside "$session_name"
   fi
+}
+
+cmd_session() {
+  if [[ "${1:-}" == "help" || "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    session_usage
+    return
+  fi
+
+  if [[ $# -eq 0 || "${1:-}" == --* ]]; then
+    cmd_session_start "$@"
+    return
+  fi
+
+  local subcmd="$1"
+  shift
+  case "$subcmd" in
+    start) cmd_session_start "$@" ;;
+    list)  [[ $# -eq 0 ]] || error "session list does not accept arguments"; cmd_session_list ;;
+    kill|close|rm|remove) cmd_session_kill "$@" ;;
+    *) error "Unknown session subcommand: $subcmd. Run 'agent-mux session --help'." ;;
+  esac
 }
 
 require_tmux_binary() {
@@ -513,9 +630,12 @@ Commands:
                                        and symlinks it to ~/.config/tmux/tmux.conf.
                                        Your existing config is backed up to ~/.agent-mux/backups/.
   update                    Update tmux-agent, agent-mux CLI, and tmux.conf to latest
-  session [start]           Create/attach a tmux session layout with coordinator/worker labels
+  session [start]           Create/attach a tmux session layout with labeled panes
     [--name <session>]        Default session name: agents
-    [--labels a,b,c]          Default labels: coordinator,worker1,worker2
+    [--labels a,b,c]          One pane per label; default: coordinator,worker1,worker2
+    [--cmds x,y,z]            Optional command per pane; count must match labels
+  session list              List tmux sessions
+  session kill --name <s>   Kill a specific tmux session
   uninstall                 Remove agent-mux and restore previous tmux config (if backed up)
   version                   Print version
   help                      Show tmux-agent and keybinding cheatsheet

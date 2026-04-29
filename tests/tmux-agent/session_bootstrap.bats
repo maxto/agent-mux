@@ -38,11 +38,15 @@ teardown() {
 }
 
 @test "agent-mux session applies custom labels inside tmux" {
-  run bash "$INSTALL_SH" session --labels lead,reviewer,tester
+  run bash "$INSTALL_SH" session --labels lead,reviewer,tester,bash
   [ "$status" -eq 0 ]
+
+  count=$(tmux -S "$SOCKET" list-panes -t session_bootstrap -F '#{pane_id}' | wc -l | tr -d ' ')
+  [ "$count" -eq 4 ]
 
   labels=$(tmux -S "$SOCKET" list-panes -t session_bootstrap -F '#{@name}' | sort | tr '\n' ' ')
   [[ "$labels" == *"lead"* ]]
   [[ "$labels" == *"reviewer"* ]]
   [[ "$labels" == *"tester"* ]]
+  [[ "$labels" == *"bash"* ]]
 }

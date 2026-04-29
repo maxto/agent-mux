@@ -22,6 +22,7 @@ teardown() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"agent-mux session"* ]]
   [[ "$output" == *"--labels a,b,c"* ]]
+  [[ "$output" == *"session kill"* ]]
 }
 
 @test "session outside tmux creates and attaches named session" {
@@ -31,12 +32,13 @@ teardown() {
   grep -q "attach-session -t custom" "$TMUX_FIXTURE_LOG"
 }
 
-@test "session outside tmux applies custom labels" {
-  run bash "$INSTALL_SH" session --labels lead,reviewer,tester
+@test "session outside tmux applies variable custom labels" {
+  run bash "$INSTALL_SH" session --labels lead,reviewer,tester,bash
   [ "$status" -eq 0 ]
   grep -q "set-option -p -t %1 @name lead" "$TMUX_FIXTURE_LOG"
   grep -q "set-option -p -t %2 @name reviewer" "$TMUX_FIXTURE_LOG"
-  grep -q "set-option -p -t %3 @name tester" "$TMUX_FIXTURE_LOG"
+  grep -q "@name tester" "$TMUX_FIXTURE_LOG"
+  grep -q "@name bash" "$TMUX_FIXTURE_LOG"
 }
 
 @test "session outside tmux attaches existing session without modifying it" {
@@ -48,14 +50,61 @@ teardown() {
   ! grep -q "new-session -d -s existing" "$TMUX_FIXTURE_LOG"
 }
 
-@test "session rejects labels with wrong count" {
-  run bash "$INSTALL_SH" session --labels one,two
+@test "session rejects empty label" {
+  run bash "$INSTALL_SH" session --labels one,,two
   [ "$status" -ne 0 ]
-  [[ "$output" == *"exactly three"* ]]
+  [[ "$output" == *"one or more comma-separated labels"* ]]
 }
 
 @test "session rejects trailing comma in labels" {
   run bash "$INSTALL_SH" session --labels one,two,three,
   [ "$status" -ne 0 ]
-  [[ "$output" == *"exactly three"* ]]
+  [[ "$output" == *"one or more comma-separated labels"* ]]
+}
+
+@test "session outside tmux launches matching commands" {
+  run bash "$INSTALL_SH" session --labels qwen,deepseek --cmds "qwen,ollama run deepseek"
+  [ "$status" -eq 0 ]
+  grep -q "send-keys -t %1 -l -- qwen" "$TMUX_FIXTURE_LOG"
+  grep -q "send-keys -t %2 -l -- ollama run deepseek" "$TMUX_FIXTURE_LOG"
+}
+
+@test "session outside tmux prints created layout before attach" {
+  run bash "$INSTALL_SH" session --labels lead,reviewer
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"lead: %1"* ]]
+  [[ "$output" == *"reviewer: %2"* ]]
+}
+
+@test "session rejects command count mismatch" {
+  run bash "$INSTALL_SH" session --labels qwen,deepseek --cmds qwen
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"--cmds count must match --labels count"* ]]
+}
+
+@test "session list shows tmux sessions" {
+  export TMUX_FIXTURE_LIST_SESSIONS=$'agents|1|1\ncrm|1|0'
+  run bash "$INSTALL_SH" session list
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"agents"* ]]
+  [[ "$output" == *"crm"* ]]
+}
+
+@test "session list prints header with no sessions" {
+  run bash "$INSTALL_SH" session list
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"SESSION"* ]]
+}
+
+@test "session kill accepts --name" {
+  export TMUX_FIXTURE_HAS_SESSION=0
+  run bash "$INSTALL_SH" session kill --name oldagents
+  [ "$status" -eq 0 ]
+  grep -q "kill-session -t oldagents" "$TMUX_FIXTURE_LOG"
+}
+
+@test "session kill requires a session name" {
+  run bash "$INSTALL_SH" session kill
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"session kill requires"* ]]
 }

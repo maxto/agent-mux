@@ -14,10 +14,14 @@ tmux-agent
 
 agent-mux
 
-  session               create/attach 3-pane coordinator/worker layout
+  session               create/attach labeled pane layout
   session --name <s>    use a custom tmux session name
   session --labels a,b,c
-                        use custom pane labels
+                        create one pane per label
+  session --cmds x,y,z  launch one command per pane
+                        commands cannot contain literal commas
+  session list          list tmux sessions
+  session kill --name s kill a specific session
 
 pane navigation
 

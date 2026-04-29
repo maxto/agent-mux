@@ -30,10 +30,11 @@ This skill is the durable protocol. If the chat is long, re-read this section be
 [ -n "$TMUX" ] && echo "in tmux ✓" || echo "NOT in tmux — cross-pane workflows will not work"
 ```
 
-**If you are NOT in tmux:** ask the user to start a tmux session, then re-launch the agent from inside it:
+**If you are NOT in tmux:** use `agent-mux session` to create a labeled tmux
+layout, then launch or attach your agent from inside it:
 
 ```bash
-tmux new-session -s agents   # starts tmux and attaches; launch your agent from here
+agent-mux session start --name agents --labels coordinator,worker1,worker2
 ```
 
 **If tmux is running but you are outside a pane** (e.g. a detached process), set the socket explicitly — subcommands like `list` and `doctor` work this way:
@@ -43,13 +44,13 @@ export TMUX_AGENT_SOCKET=$(tmux display-message -p '#{socket_path}')
 tmux-agent list   # works without $TMUX if the server is reachable
 ```
 
-**`tmux-agent` does NOT create sessions or split panes.** To open a new pane, use raw tmux:
+**`tmux-agent` does NOT create sessions or split panes.** Use `agent-mux session`
+for session lifecycle and layout:
 
 ```bash
-# Split and capture the new pane ID in one step:
-NEW_PANE=$(tmux split-window -h -PF '#{pane_id}')
-tmux-agent name "$NEW_PANE" worker
-tmux-agent send worker "hello"
+agent-mux session start --name local --labels qwen,deepseek,kimi --cmds qwen,deepseek,kimi
+agent-mux session list
+agent-mux session kill --name local
 ```
 
 ## tmux-agent — Cross-Pane Communication

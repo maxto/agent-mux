@@ -10,7 +10,12 @@ fi
 
 case "$1" in
   -V)            echo "tmux 3.3a" ;;
-  list-sessions) exit 0 ;;
+  list-sessions)
+    if [[ -n "${TMUX_FIXTURE_LIST_SESSIONS:-}" ]]; then
+      printf '%s\n' "$TMUX_FIXTURE_LIST_SESSIONS"
+    fi
+    exit 0
+    ;;
   has-session)   exit "${TMUX_FIXTURE_HAS_SESSION:-1}" ;;
   new-session)
     case "$*" in
