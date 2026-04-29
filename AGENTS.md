@@ -30,6 +30,10 @@ Write tests in Bats and name files by behavior area, such as `read_guard.bats` o
 
 History uses Conventional Commit-style prefixes such as `feat:`, `fix:`, `docs:`, and `chore:`. Keep commits focused and imperative, for example `fix: preserve trailing newlines in send --path`. Pull requests should explain the behavior change, list the tests run, link related issues when applicable, and include screenshots or terminal snippets only for user-visible CLI or tmux changes.
 
+## Versioning Guidelines
+
+Current version is `1.7.0`. Use conservative semantic versioning: bump `PATCH` (`0.0.1`) for fixes, docs, tests, and small tweaks; bump `MINOR` (`0.1.0`) only for new public commands or capabilities with tests and updated docs; reserve `MAJOR` for breaking CLI or protocol changes. Update both `install.sh` and `scripts/tmux-agent` when changing the version.
+
 ## Agent-Specific Instructions
 
 Do not weaken `tmux-agent` read-before-act behavior: agents must read a pane before typing or sending keys. Keep installer changes conservative because `install.sh` modifies user shell rc files and may manage `~/.config/tmux/tmux.conf` only when `--with-config` is requested.
