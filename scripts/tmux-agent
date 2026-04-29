@@ -3,7 +3,7 @@
 # Any tool that can run bash can use this to talk to other panes.
 set -euo pipefail
 
-VERSION="1.6.0"
+VERSION="1.7.0"
 
 # --- Helpers ---
 
@@ -52,6 +52,18 @@ cursor_base() {
   local uid
   uid=$(id -u)
   echo "${TMUX_AGENT_CURSOR_DIR:-/tmp/agent-mux-${uid}/cursors}"
+}
+
+audit_base() {
+  local uid
+  uid=$(id -u)
+  echo "${XDG_RUNTIME_DIR:-/tmp/agent-mux-${uid}}/audit"
+}
+
+pause_flag() {
+  local uid
+  uid=$(id -u)
+  echo "${XDG_RUNTIME_DIR:-/tmp/agent-mux-${uid}}/PAUSED"
 }
 
 file_mtime() {
@@ -124,6 +136,94 @@ thread_write_file() {
   mv "$tmp" "${tdir}/messages/${seq}.md"
   release_lock "$tdir"
   echo "$seq"
+}
+
+# --- Audit ---
+# Append-only JSONL log of send/thread/pause events per tmux session.
+# Best-effort: failures are silently ignored so they never disrupt sends.
+
+_audit_ts() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+
+_audit_session_name() {
+  [[ -n "${TMUX_PANE:-}" ]] \
+    && tmx display-message -t "$TMUX_PANE" -p '#{session_name}' 2>/dev/null \
+    || echo "nosession"
+}
+
+_audit_event() {
+  local event="$1" from="${2:-}" to="${3:-}" bytes="${4:-0}" \
+        transport="${5:-}" thread_id="${6:-}" status="${7:-ok}"
+  local dir session logfile
+  dir="$(audit_base)"
+  session="$(_audit_session_name)"
+  logfile="${dir}/${session}.jsonl"
+  mkdir -p "$dir" 2>/dev/null || return 0
+  printf '{"ts":"%s","session":"%s","event":"%s","from":"%s","to":"%s","bytes":%s,"transport":"%s","thread_id":"%s","status":"%s"}\n' \
+    "$(_audit_ts)" "$session" "$event" "$from" "$to" \
+    "${bytes:-0}" "$transport" "$thread_id" "$status" \
+    >> "$logfile" 2>/dev/null || true
+}
+
+# --- Pause / Resume ---
+# A flag file blocks all pane-injection commands until removed by 'resume'.
+# Read-only commands (read, list, resolve, doctor) are never blocked.
+
+check_paused() {
+  [[ -f "$(pause_flag)" ]] || return 0
+  die "agent-mux is paused. Run 'tmux-agent resume' to continue."
+}
+
+cmd_pause() {
+  init_socket 2>/dev/null || true
+  local reason="${1:-}" flag
+  flag="$(pause_flag)"
+  mkdir -p "$(dirname "$flag")" 2>/dev/null || true
+  { printf 'paused_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf 'paused_by=%s\n' "${TMUX_PANE:-unknown}"
+    [[ -n "$reason" ]] && printf 'reason=%s\n' "$reason"
+  } > "$flag"
+  _audit_event pause "${TMUX_PANE:-unknown}" "" 0 "" "" ok
+  echo "Paused. All sends blocked until 'tmux-agent resume'."
+}
+
+cmd_resume() {
+  init_socket 2>/dev/null || true
+  rm -f "$(pause_flag)"
+  _audit_event resume "${TMUX_PANE:-unknown}" "" 0 "" "" ok
+  echo "Resumed."
+}
+
+cmd_status() {
+  local flag; flag="$(pause_flag)"
+  if [[ -f "$flag" ]]; then
+    echo "state: PAUSED"
+    grep . "$flag" | sed 's/^/  /'
+  else
+    echo "state: running"
+  fi
+}
+
+# --- Header Guard ---
+# Rejects payloads whose lines start with the reserved tmux-agent header prefix.
+# Applied to text sends and thread payloads; cmd_type is intentionally exempt.
+
+check_header_injection() {
+  local payload="$1"
+  if printf '%s\n' "$payload" | grep -qE '^\[tmux-agent v[0-9]'; then
+    _audit_event header_guard_block "${TMUX_PANE:-unknown}" "" "${#payload}" "" "" blocked
+    die "payload contains reserved tmux-agent header pattern.
+  Remove the '[tmux-agent v1 ...]' line or use a different format."
+  fi
+}
+
+check_header_injection_file() {
+  local path="$1"
+  if grep -qE '^\[tmux-agent v[0-9]' "$path" 2>/dev/null; then
+    local bytes; bytes=$(file_size "$path")
+    _audit_event header_guard_block "${TMUX_PANE:-unknown}" "" "$bytes" "" "" blocked
+    die "payload file contains reserved tmux-agent header pattern.
+  Remove the '[tmux-agent v1 ...]' line or use a different format."
+  fi
 }
 
 # Detect the correct tmux server socket.
@@ -351,6 +451,7 @@ cmd_list() {
 cmd_type() {
   require_args 2 $# "type"
   require_tmux
+  check_paused
   local target
   target=$(resolve_target "$1")
   validate_target "$target"
@@ -397,6 +498,7 @@ inline_threshold() {
 cmd_send() {
   require_args 2 $# "send"
   require_tmux
+  check_paused
   if [[ "${1:-}" == "--file" ]]; then
     shift; cmd_send_file "$@"; return
   fi
@@ -415,6 +517,7 @@ cmd_send() {
   target=$(resolve_target "$1")
   validate_target "$target"
   local text="${*:2}"
+  check_header_injection "$text"
   local threshold
   threshold=$(inline_threshold)
 
@@ -430,6 +533,7 @@ cmd_send() {
   cmd_read "$target" 10 >/dev/null
   sleep 0.1
   cmd_keys "$target" Enter
+  _audit_event send "${TMUX_PANE:-unknown}" "$target" "$byte_len" inline ""
 }
 
 cmd_send_file() {
@@ -464,6 +568,16 @@ _send_thread() {
     "$thread_id" "$(date -u +%Y%m%dT%H%M%SZ)" "$from_label" "$sender_pane" \
     > "${tdir}/manifest.json"
 
+  # Header guard and size accounting before write
+  local payload_bytes
+  if [[ "$kind" == "file" ]]; then
+    check_header_injection_file "$src"
+    payload_bytes=$(file_size "$src")
+  else
+    check_header_injection "$src"
+    payload_bytes=${#src}
+  fi
+
   # Write message atomically — ping is sent ONLY after successful write
   local seq
   if [[ "$kind" == "file" ]]; then
@@ -471,6 +585,7 @@ _send_thread() {
   else
     seq=$(thread_write "$tdir" "$src")
   fi
+  _audit_event thread_create "$from_label" "$target" "$payload_bytes" thread "$thread_id"
 
   local ping="[tmux-agent v1 kind=thread thread=${thread_id} seq=${seq} from=${from_label} pane=${sender_pane} at=${session_win} reply=${sender_pane}]"
   cmd_read "$target" 10 >/dev/null
@@ -479,6 +594,7 @@ _send_thread() {
   cmd_read "$target" 10 >/dev/null
   sleep 0.1
   cmd_keys "$target" Enter
+  _audit_event send "$from_label" "$target" "$payload_bytes" thread "$thread_id"
 
   echo "thread: $thread_id"
 }
@@ -738,6 +854,7 @@ cmd_thread_read() {
     printf '%06d' "$last_seq" > "$tmp"
     mv "$tmp" "$cursor_file"
   fi
+  _audit_event thread_read "${TMUX_PANE:-unknown}" "" 0 "" "$thread_id"
 }
 
 cmd_thread_gc() {
@@ -808,6 +925,52 @@ cmd_thread_gc() {
   echo "gc: removed ${removed} thread(s), broke ${broken} stale lock(s), cleaned ${orphaned} orphaned cursor dir(s)"
 }
 
+cmd_audit() {
+  init_socket 2>/dev/null || true
+  local sub="${1:-tail}"; shift || true
+  local dir session logfile
+  dir="$(audit_base)"
+  session="$(_audit_session_name)"
+  logfile="${dir}/${session}.jsonl"
+  case "$sub" in
+    tail)
+      if [[ ! -f "$logfile" ]]; then
+        echo "(no audit log for session '$session')"
+        return 0
+      fi
+      tail -n "${1:-20}" "$logfile"
+      ;;
+    grep)
+      [[ $# -gt 0 ]] || die "audit grep requires a pattern"
+      if [[ ! -f "$logfile" ]]; then
+        echo "(no audit log for session '$session')"
+        return 0
+      fi
+      grep -- "$1" "$logfile"
+      ;;
+    stats)
+      if [[ ! -f "$logfile" ]]; then
+        echo "(no audit log for session '$session')"
+        return 0
+      fi
+      awk '{
+        if (/\"event\":\"send\"/)         sends++
+        if (/\"event\":\"thread_create\"/) threads++
+        if (/\"bytes\":([0-9]+)/) {
+          match($0, /"bytes":([0-9]+)/, a); bytes += a[1]
+        }
+        if (/header_guard_block/)         blocked++
+        if (/\"event\":\"pause\"/)        pauses++
+      }
+      END {
+        printf "session:  %s\nsends:    %d\nthreads:  %d\nbytes:    %d\nblocked:  %d\npauses:   %d\n",
+          FILENAME, sends+0, threads+0, bytes+0, blocked+0, pauses+0
+      }' "$logfile"
+      ;;
+    *) die "audit: unknown subcommand '$sub'. Use: tail [n], grep <pattern>, stats" ;;
+  esac
+}
+
 # --- Main ---
 
 [[ $# -eq 0 ]] && usage
@@ -818,6 +981,10 @@ case "$1" in
   version)   echo "tmux-agent $VERSION"; exit ;;
   thread)    shift; cmd_thread "$@"; exit ;;
   threshold) inline_threshold; exit ;;
+  pause)     shift; cmd_pause  "$@"; exit ;;
+  resume)    shift; cmd_resume "$@"; exit ;;
+  status)    shift; cmd_status "$@"; exit ;;
+  audit)     shift; cmd_audit  "$@"; exit ;;
 esac
 
 # All other commands need the socket

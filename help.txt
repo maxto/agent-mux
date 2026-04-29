@@ -11,6 +11,11 @@ tmux-agent
   id                    print this pane ID
   version               print version
   doctor                diagnose connectivity
+  pause [reason]        block all cross-pane sends
+  resume                unblock sends
+  status                show paused/running state
+  audit tail [n]        show last N audit events
+  audit stats           show session send/thread counters
 
 agent-mux
 

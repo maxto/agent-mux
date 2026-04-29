@@ -2,7 +2,7 @@
 # agent-mux — one-command tmux setup
 set -euo pipefail
 
-VERSION="1.6.0"
+VERSION="1.7.0"
 REPO="maxto/agent-mux"
 BRANCH="v${VERSION}"
 BASE_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
@@ -636,6 +636,12 @@ Commands:
     [--cmds x,y,z]            Optional command per pane; count must match labels
   session list              List tmux sessions
   session kill --name <s>   Kill a specific tmux session
+  (tmux-agent commands — safety and observability)
+  tmux-agent pause [reason] Pause all cross-pane sends
+  tmux-agent resume         Resume sends after pause
+  tmux-agent status         Show paused/running state
+  tmux-agent audit tail [n] Show last N audit events (default 20)
+  tmux-agent audit stats    Show send/thread/block counters
   uninstall                 Remove agent-mux and restore previous tmux config (if backed up)
   version                   Print version
   help                      Show tmux-agent and keybinding cheatsheet

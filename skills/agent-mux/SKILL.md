@@ -250,6 +250,45 @@ tmux-agent send %4 '87% line coverage. Missing the OAuth refresh token path (lin
 
 ---
 
+## Structured Handoff
+
+When handing work to another pane, send a structured summary via thread transport.
+Do NOT paste raw terminal output or full transcripts — use this template instead:
+
+```markdown
+# agent-mux Handoff
+
+task_id:      (if using task tracking)
+from:         (your pane label)
+to:           (target pane label)
+status:       done | blocked | needs_review | needs_context | failed
+
+## Goal
+## Current State
+## Relevant Files
+## Findings
+## Changes Made
+## Commands Run
+## Test Results
+## Open Risks
+## Next Action Requested
+```
+
+Send via thread transport (auto-selected for content > 2KB):
+```bash
+tmux-agent send --file <target> "$(cat handoff.md)"
+# or write to file first:
+tmux-agent send --path <target> handoff.md
+```
+
+Rules:
+- Include only facts, not raw scrollback.
+- If tests were run, include pass/fail counts.
+- List files changed, not their full content.
+- State clearly what the next agent should do.
+
+---
+
 ## Raw tmux Commands
 
 Use these when you need direct tmux control beyond what tmux-agent provides — session management, window navigation, creating panes, or low-level scripting.
@@ -329,6 +368,9 @@ done
 - **Non-agent panes** are the exception — you DO need to read them to see output
 - Use `capture-pane -p` to print to stdout (essential for scripting)
 - Target format: `session:window.pane` (e.g., `shared:0.0`)
+- **Use `pause`/`resume`** — stop all cross-pane sends instantly (kill switch for runaway loops)
+- **Use `audit tail`** — inspect recent sends for post-mortem debugging
+- **Never send `[tmux-agent v1 ...]` headers** — the header guard blocks payloads that look like routing metadata
 
 ## Security Model
 
