@@ -78,6 +78,9 @@ Targets can be:
 - **tmux native**: `session:window.pane` (e.g. `shared:0.1`), pane ID (`%3`), or window index (`0`)
 - **label**: Any string set via `tmux-agent name` — resolved automatically
 
+Labels prefer panes in the caller's tmux session. Use a pane ID or full address
+when you intentionally need a pane in another session.
+
 This means `tmux-agent type codex "hello"` works directly if the pane was labeled `codex`.
 
 ## Messaging Convention

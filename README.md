@@ -221,6 +221,9 @@ A target identifies a pane. Three formats work:
 - **Pane ID** — tmux native: `%3`
 - **Full address** — `session:window.pane`: `agents:0.1`
 
+Labels prefer panes in the caller's tmux session. If you need to target another
+session, use a pane ID or full address.
+
 Name a pane once, use the label everywhere:
 
 ```bash

@@ -106,6 +106,10 @@ Targets can be:
 - **tmux native**: `session:window.pane` (e.g. `shared:0.1`), pane ID (`%3`), or window index (`0`)
 - **label**: Any string set via `tmux-agent name` — resolved automatically
 
+Labels prefer panes in the caller's tmux session. If multiple projects reuse
+labels like `claude` or `codex`, use the local label normally; use a pane ID or
+full address to target another session.
+
 ### Sending a Message
 
 Use `send` for agent-to-agent messages — it runs the full cycle in one command:

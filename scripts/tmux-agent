@@ -238,7 +238,7 @@ Commands:
 
 Target resolution:
   Targets can be tmux native (session:window.pane, %N) or a label set via 'name'.
-  Labels are resolved automatically — e.g. 'tmux-agent type codex "hello"' works.
+  Labels prefer the caller's tmux session, then fall back to global resolution.
 
 Environment:
   TMUX_AGENT_SOCKET            Override the tmux server socket path (skips auto-detection)
@@ -277,12 +277,29 @@ resolve_target() {
 
 resolve_label() {
   local label="$1"
-  local matches count result
-  matches=$(tmx list-panes -a -F '#{pane_id} #{@name}' 2>/dev/null \
-    | awk -v lbl="$label" '$2 == lbl { print $1 }')
+  local current_session="" matches session_matches count result
+  if [[ -n "${TMUX_PANE:-}" ]]; then
+    current_session=$(tmx display-message -t "$TMUX_PANE" -p '#{session_name}' 2>/dev/null || true)
+  fi
+
+  matches=$(tmx list-panes -a -F '#{pane_id}|#{session_name}|#{@name}' 2>/dev/null \
+    | awk -F'|' -v lbl="$label" '$3 == lbl { print $1 "|" $2 }')
   if [[ -z "$matches" ]]; then
     die "no pane found with label '$label'"
   fi
+
+  if [[ -n "$current_session" ]]; then
+    session_matches=$(printf '%s\n' "$matches" \
+      | awk -F'|' -v sess="$current_session" '$2 == sess { print $1 }')
+    if [[ -n "$session_matches" ]]; then
+      matches="$session_matches"
+    else
+      matches=$(printf '%s\n' "$matches" | awk -F'|' '{ print $1 }')
+    fi
+  else
+    matches=$(printf '%s\n' "$matches" | awk -F'|' '{ print $1 }')
+  fi
+
   count=$(printf '%s\n' "$matches" | wc -l | tr -d ' ')
   if (( count > 1 )); then
     die "label '$label' is ambiguous; matching panes: $(printf '%s' "$matches" | tr '\n' ' ')"

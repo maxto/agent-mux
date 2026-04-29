@@ -60,6 +60,25 @@ teardown() {
   [[ "$output" == *"$SECOND_PANE"* ]]
 }
 
+@test "resolve prefers duplicate label in caller session" {
+  OTHER_PANE=$(tmux -S "$SOCKET" new-session -d -s other -PF '#{pane_id}')
+  bash "$TMUX_AGENT" name "$TEST_PANE" claude
+  bash "$TMUX_AGENT" name "$OTHER_PANE" claude
+
+  run bash "$TMUX_AGENT" resolve claude
+  [ "$status" -eq 0 ]
+  [ "$output" = "$TEST_PANE" ]
+}
+
+@test "resolve falls back to other session when label is absent locally" {
+  OTHER_PANE=$(tmux -S "$SOCKET" new-session -d -s other -PF '#{pane_id}')
+  bash "$TMUX_AGENT" name "$OTHER_PANE" crosssession
+
+  run bash "$TMUX_AGENT" resolve crosssession
+  [ "$status" -eq 0 ]
+  [ "$output" = "$OTHER_PANE" ]
+}
+
 @test "type accepts label as target" {
   bash "$TMUX_AGENT" name "$TEST_PANE" typetarget
   bash "$TMUX_AGENT" read typetarget
