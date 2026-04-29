@@ -210,6 +210,11 @@ A CLI to send text to any tmux pane — without copy-paste. Works from your shel
 | `tmux-agent thread read <id> [--since-cursor]` | Read thread messages (all or since last cursor) |
 | `tmux-agent thread read <id> --head N\|--tail N\|--bytes N` | Preview part of a thread without advancing the cursor |
 | `tmux-agent thread gc [--ttl <sec>]` | Remove old threads (default TTL: 3600s) |
+| `tmux-agent pause [reason]` | Block all cross-pane sends (kill switch for runaway loops) |
+| `tmux-agent resume` | Unblock sends |
+| `tmux-agent status` | Show paused / running state |
+| `tmux-agent audit tail [n]` | Show last N audit events for the current session |
+| `tmux-agent audit stats` | Show send / thread counters for the current session |
 | `tmux-agent resolve <label>` | Get the pane ID for a label |
 | `tmux-agent id` | Print your own pane ID |
 | `tmux-agent doctor` | Check tmux connectivity |
@@ -377,7 +382,7 @@ For other agents, point them at `skills/agent-mux/SKILL.md` — paste it into th
 
 ## Requirements
 
-- Linux, Win-WSL2 (Windows Subsystem for Linux), or macOS (requires [Homebrew](https://brew.sh))
-- tmux 3.2+ — installed automatically by the global installer if missing
-- bash
-- curl or wget (for install)
+- **OS**: Linux, macOS, or Windows (WSL2)
+- **tmux**: 3.2+ — installed automatically if missing (macOS requires [Homebrew](https://brew.sh))
+- **Shell**: bash
+- **For install / update**: curl or wget
