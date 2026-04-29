@@ -125,6 +125,165 @@ download() {
   fi
 }
 
+tmux_cmd() {
+  local socket="${TMUX_AGENT_SOCKET:-}"
+  if [[ -z "$socket" && -n "${TMUX:-}" ]]; then
+    socket="${TMUX%%,*}"
+  fi
+
+  if [[ -n "$socket" ]]; then
+    tmux -S "$socket" "$@"
+  else
+    tmux "$@"
+  fi
+}
+
+session_usage() {
+  cat <<'EOF'
+agent-mux session — bootstrap a tmux layout for multi-agent work
+
+Usage:
+  agent-mux session [start] [--name <session>] [--labels a,b,c]
+
+Defaults:
+  --name agents
+  --labels coordinator,worker1,worker2
+
+Behavior:
+  Inside tmux, run from the pane you want as coordinator; missing worker panes are created.
+  Outside tmux, creates the session if needed and attaches to it.
+EOF
+}
+
+parse_session_labels() {
+  local raw="$1"
+  [[ "$raw" =~ ^[^,]+,[^,]+,[^,]+$ ]] || error "--labels requires exactly three comma-separated labels"
+  IFS=',' read -r SESSION_LABEL_1 SESSION_LABEL_2 SESSION_LABEL_3 SESSION_LABEL_EXTRA <<< "$raw"
+
+  if [[ -z "${SESSION_LABEL_1:-}" || -z "${SESSION_LABEL_2:-}" || -z "${SESSION_LABEL_3:-}" || -n "${SESSION_LABEL_EXTRA:-}" ]]; then
+    error "--labels requires exactly three comma-separated labels"
+  fi
+
+  local label
+  for label in "$SESSION_LABEL_1" "$SESSION_LABEL_2" "$SESSION_LABEL_3"; do
+    if [[ ! "$label" =~ ^[A-Za-z0-9._-]+$ ]]; then
+      error "invalid label '$label'. Use letters, numbers, dot, underscore, or dash."
+    fi
+  done
+}
+
+current_tmux_pane() {
+  [[ -n "${TMUX_PANE:-}" ]] || return 1
+  tmux_cmd display-message -t "$TMUX_PANE" -p '#{pane_id}' 2>/dev/null
+}
+
+find_labeled_pane_in_window() {
+  local window="$1" label="$2"
+  tmux_cmd list-panes -t "$window" -F '#{pane_id}|#{@name}' 2>/dev/null \
+    | awk -F'|' -v lbl="$label" '$2 == lbl { print $1; exit }'
+}
+
+label_pane() {
+  local pane="$1" label="$2"
+  tmux_cmd set-option -p -t "$pane" @name "$label" >/dev/null
+}
+
+cmd_session_start_inside() {
+  local current_pane="$1"
+  local current_window worker1 worker2
+  current_window=$(tmux_cmd display-message -t "$current_pane" -p '#{window_id}')
+
+  worker1=$(find_labeled_pane_in_window "$current_window" "$SESSION_LABEL_2")
+  worker2=$(find_labeled_pane_in_window "$current_window" "$SESSION_LABEL_3")
+
+  label_pane "$current_pane" "$SESSION_LABEL_1"
+
+  if [[ -z "$worker1" ]]; then
+    worker1=$(tmux_cmd split-window -h -t "$current_pane" -PF '#{pane_id}')
+  fi
+  label_pane "$worker1" "$SESSION_LABEL_2"
+
+  if [[ -z "$worker2" ]]; then
+    worker2=$(tmux_cmd split-window -v -t "$worker1" -PF '#{pane_id}')
+  fi
+  label_pane "$worker2" "$SESSION_LABEL_3"
+
+  tmux_cmd select-layout -t "$current_window" tiled >/dev/null 2>&1 || true
+
+  info "Session layout ready:"
+  echo "  $SESSION_LABEL_1: $current_pane"
+  echo "  $SESSION_LABEL_2: $worker1"
+  echo "  $SESSION_LABEL_3: $worker2"
+}
+
+cmd_session_start_outside() {
+  local session_name="$1"
+  if tmux_cmd has-session -t "$session_name" 2>/dev/null; then
+    info "Session '$session_name' already exists; attaching without modifying it."
+    echo "Run 'agent-mux session' inside tmux to apply the default labels if needed."
+    tmux_cmd attach-session -t "$session_name"
+    return
+  fi
+
+  local coordinator worker1 worker2
+  coordinator=$(tmux_cmd new-session -d -s "$session_name" -n agents -PF '#{pane_id}')
+  worker1=$(tmux_cmd split-window -h -t "$coordinator" -PF '#{pane_id}')
+  worker2=$(tmux_cmd split-window -v -t "$worker1" -PF '#{pane_id}')
+
+  label_pane "$coordinator" "$SESSION_LABEL_1"
+  label_pane "$worker1" "$SESSION_LABEL_2"
+  label_pane "$worker2" "$SESSION_LABEL_3"
+  tmux_cmd select-layout -t "${session_name}:0" tiled >/dev/null 2>&1 || true
+
+  info "Created tmux session '$session_name'."
+  tmux_cmd attach-session -t "$session_name"
+}
+
+cmd_session() {
+  local subcmd="${1:-start}"
+  if [[ "$subcmd" == "help" || "$subcmd" == "--help" || "$subcmd" == "-h" ]]; then
+    session_usage
+    return
+  fi
+  if [[ "$subcmd" == "start" ]]; then
+    shift || true
+  fi
+
+  local session_name="agents"
+  local labels="coordinator,worker1,worker2"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --name)
+        shift
+        [[ $# -gt 0 ]] || error "--name requires a session name"
+        session_name="$1"
+        ;;
+      --labels)
+        shift
+        [[ $# -gt 0 ]] || error "--labels requires a value"
+        labels="$1"
+        ;;
+      *) error "Unknown session option: $1. Run 'agent-mux session --help'." ;;
+    esac
+    shift
+  done
+
+  [[ "$session_name" =~ ^[A-Za-z0-9._-]+$ ]] || error "invalid session name '$session_name'"
+  require_tmux_binary
+  parse_session_labels "$labels"
+
+  local current_pane
+  if current_pane=$(current_tmux_pane); then
+    cmd_session_start_inside "$current_pane"
+  else
+    cmd_session_start_outside "$session_name"
+  fi
+}
+
+require_tmux_binary() {
+  command -v tmux >/dev/null 2>&1 || error "tmux is not installed or not in PATH"
+}
+
 # --- Commands ---
 
 install_skill() {
@@ -354,6 +513,9 @@ Commands:
                                        and symlinks it to ~/.config/tmux/tmux.conf.
                                        Your existing config is backed up to ~/.agent-mux/backups/.
   update                    Update tmux-agent, agent-mux CLI, and tmux.conf to latest
+  session [start]           Create/attach a tmux session layout with coordinator/worker labels
+    [--name <session>]        Default session name: agents
+    [--labels a,b,c]          Default labels: coordinator,worker1,worker2
   uninstall                 Remove agent-mux and restore previous tmux config (if backed up)
   version                   Print version
   help                      Show tmux-agent and keybinding cheatsheet
@@ -386,6 +548,7 @@ case "${1:-}" in
   "")                              _default_cmd "$@" ;;
   install)                         cmd_install "${@:2}" ;;
   update)                          cmd_update ;;
+  session)                         cmd_session "${@:2}" ;;
   uninstall|remove)                cmd_uninstall ;;
   version|--version|-v|-V)         cmd_version ;;
   help|cheatsheet|cheat|keys)      cmd_help ;;

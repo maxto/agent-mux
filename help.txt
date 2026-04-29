@@ -12,6 +12,13 @@ tmux-agent
   version               print version
   doctor                diagnose connectivity
 
+agent-mux
+
+  session               create/attach 3-pane coordinator/worker layout
+  session --name <s>    use a custom tmux session name
+  session --labels a,b,c
+                        use custom pane labels
+
 pane navigation
 
   Alt+i/k/j/l           up / down / left / right
@@ -37,4 +44,3 @@ clipboard
   drag to select        copy to system clipboard
   Ctrl+Shift+V          paste (Windows Terminal)
   Shift+right-click     paste (Windows Terminal)
-

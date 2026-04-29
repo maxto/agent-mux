@@ -36,6 +36,9 @@ source ~/.bashrc   # or open a new terminal
 # 2. Start a tmux session (tmux-agent only works inside tmux)
 tmux new-session -s agents
 
+# Optional: create a 3-pane coordinator/worker layout
+agent-mux session
+
 # 3. Install the skill — once per project
 cd your-project
 agent-mux install
@@ -126,6 +129,7 @@ Installs the agent-mux tmux config, backs up your existing one to `~/.agent-mux/
 | `agent-mux install --with-config` | Also install the tmux config, symlinked to `~/.config/tmux/tmux.conf` (existing config backed up to `~/.agent-mux/backups/`) |
 | `agent-mux install --project-dir <path>` | Install the skill into `<path>` instead of `$PWD` |
 | `agent-mux update` | Re-download tmux-agent and agent-mux CLI; refreshes tmux config only if `--with-config` was previously used; refreshes skill if present in `$PWD` |
+| `agent-mux session [--name agents] [--labels coordinator,worker1,worker2]` | Create or attach a tmux session with a 3-pane coordinator/worker layout and pane labels |
 | `agent-mux uninstall` | Remove `~/.agent-mux/`, restore previous tmux config from backup (if available). Note: does not remove the `PATH` line added to your shell rc file. |
 | `agent-mux version` | Print version |
 | `agent-mux help` | Show tmux-agent and keybinding cheatsheet |
