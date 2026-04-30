@@ -49,6 +49,15 @@ agent-mux install
 
 Your coordinator agent now knows how to use `tmux-agent` to talk to other panes, launch agents, and coordinate work.
 
+For a practical multi-agent layout, choose any labels and commands you use locally:
+
+```bash
+agent-mux session start \
+  --name agents \
+  --labels coordinator,codex,gemini \
+  --cmds claude,codex,gemini
+```
+
 ## Example
 
 Three agents, one project. One coordinator agent handles everything else.
@@ -63,6 +72,46 @@ The coordinator sets up the panes, launches the agents, and coordinates via `tmu
 ```
 
 See [`examples/hello-agents/`](examples/hello-agents/) for the full walkthrough.
+
+## Common Workflows
+
+### Coordinator, Implementer, Reviewer
+
+Use one pane as coordinator, one as implementer, and one as reviewer. Name panes
+early so instructions stay readable:
+
+```bash
+tmux-agent name %1 coordinator
+tmux-agent name %2 implementer
+tmux-agent name %3 reviewer
+tmux-agent send implementer "Implement the failing test fix. Report files changed and tests run."
+tmux-agent send reviewer "Review the implementation after the implementer replies."
+```
+
+### Parallel Review
+
+Ask two agents to inspect the same change from different angles, then reconcile
+their replies in the coordinator pane:
+
+```bash
+tmux-agent send codex "Review this branch for regressions. Focus on tests and edge cases."
+tmux-agent send gemini "Review this branch independently. Focus on design and simplification."
+```
+
+### Large Handoffs
+
+For diffs, logs, summaries, or review packets, prefer thread transport. The
+receiver gets a compact ping and reads the payload only when needed:
+
+```bash
+tmux-agent send --path reviewer handoff.md
+tmux-agent thread stat <thread-id>
+tmux-agent thread read <thread-id> --head 80
+```
+
+Use `tmux-agent pause "reason"` to stop cross-pane sends during a runaway loop,
+`tmux-agent status` to check the kill switch, and `tmux-agent audit tail` to
+inspect recent sends during debugging.
 
 ## Mental model
 

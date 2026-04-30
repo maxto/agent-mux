@@ -231,6 +231,51 @@ tmux-agent list
 tmux-agent send codex 'Please review the changes in src/auth.ts'
 ```
 
+### Practical Collaboration Patterns
+
+**Coordinator + implementer + reviewer**
+
+Use explicit roles and keep ownership visible in the coordinator's plan:
+
+```bash
+tmux-agent name %1 coordinator
+tmux-agent name %2 implementer
+tmux-agent name %3 reviewer
+tmux-agent send implementer 'Fix the failing test. Reply with files changed, commands run, and risks.'
+tmux-agent send reviewer 'After the implementer replies, review the diff and test coverage.'
+```
+
+**Parallel review**
+
+Ask independent agents for different review angles, then reconcile their replies:
+
+```bash
+tmux-agent send codex 'Review this branch for regressions and missing tests.'
+tmux-agent send gemini 'Review this branch independently for design and simplification.'
+```
+
+**Large handoff**
+
+Write long summaries, diffs, or logs to a file and send the path. The receiver
+gets a compact thread ping and can preview before loading the full payload:
+
+```bash
+tmux-agent send --path reviewer handoff.md
+tmux-agent thread stat <thread-id>
+tmux-agent thread read <thread-id> --head 80
+```
+
+**Runaway loop or wrong target**
+
+Pause cross-pane sends immediately, inspect state, then resume only when clear:
+
+```bash
+tmux-agent pause "checking routing"
+tmux-agent status
+tmux-agent audit tail
+tmux-agent resume
+```
+
 ### Example Conversation
 
 **Agent A (coordinator) sends:**
