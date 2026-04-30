@@ -24,6 +24,10 @@ setup() {
   cursor_file_for() {
     echo "${TMUX_AGENT_CURSOR_DIR}/${1}/_1"
   }
+
+  audit_log_for_test() {
+    find "${XDG_RUNTIME_DIR}/audit" -name '*.jsonl' -type f 2>/dev/null | head -1
+  }
 }
 
 teardown() {
@@ -111,6 +115,25 @@ teardown() {
   run bash "$TMUX_AGENT" thread read "no-such-thread-xyz"
   [ "$status" -ne 0 ]
   [[ "$output" == *"thread not found"* ]]
+}
+
+@test "thread read: missing thread writes audit event" {
+  run bash "$TMUX_AGENT" thread read "no-such-thread-audit"
+  [ "$status" -ne 0 ]
+
+  local logfile; logfile="$(audit_log_for_test)"
+  [ -f "$logfile" ]
+  grep -q '"event":"thread_missing"' "$logfile"
+  grep -q '"thread_id":"no-such-thread-audit"' "$logfile"
+}
+
+@test "thread read: audit event escapes JSON string fields" {
+  run bash "$TMUX_AGENT" thread read 'missing-"quote"'
+  [ "$status" -ne 0 ]
+
+  local logfile; logfile="$(audit_log_for_test)"
+  [ -f "$logfile" ]
+  grep -q '"thread_id":"missing-\\"quote\\""' "$logfile"
 }
 
 @test "thread read: cursor update is atomic (tmp+mv, no .cur- files left)" {

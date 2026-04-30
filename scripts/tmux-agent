@@ -3,7 +3,7 @@
 # Any tool that can run bash can use this to talk to other panes.
 set -euo pipefail
 
-VERSION="1.7.0"
+VERSION="1.7.1"
 
 # --- Helpers ---
 
@@ -140,7 +140,7 @@ thread_write_file() {
 
 # --- Audit ---
 # Append-only JSONL log of send/thread/pause events per tmux session.
-# Best-effort: failures are silently ignored so they never disrupt sends.
+# Best-effort: failures are ignored so they never disrupt sends.
 
 _audit_ts() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 
@@ -150,6 +150,18 @@ _audit_session_name() {
     || echo "nosession"
 }
 
+json_escape() {
+  local value="${1:-}"
+  value=${value//\\/\\\\}
+  value=${value//\"/\\\"}
+  value=${value//$'\n'/\\n}
+  value=${value//$'\r'/\\r}
+  value=${value//$'\t'/\\t}
+  value=${value//$'\b'/\\b}
+  value=${value//$'\f'/\\f}
+  printf '%s' "$value"
+}
+
 _audit_event() {
   local event="$1" from="${2:-}" to="${3:-}" bytes="${4:-0}" \
         transport="${5:-}" thread_id="${6:-}" status="${7:-ok}"
@@ -157,10 +169,13 @@ _audit_event() {
   dir="$(audit_base)"
   session="$(_audit_session_name)"
   logfile="${dir}/${session}.jsonl"
+  [[ "$bytes" =~ ^[0-9]+$ ]] || bytes=0
   mkdir -p "$dir" 2>/dev/null || return 0
   printf '{"ts":"%s","session":"%s","event":"%s","from":"%s","to":"%s","bytes":%s,"transport":"%s","thread_id":"%s","status":"%s"}\n' \
-    "$(_audit_ts)" "$session" "$event" "$from" "$to" \
-    "${bytes:-0}" "$transport" "$thread_id" "$status" \
+    "$(json_escape "$(_audit_ts)")" "$(json_escape "$session")" \
+    "$(json_escape "$event")" "$(json_escape "$from")" "$(json_escape "$to")" \
+    "$bytes" "$(json_escape "$transport")" "$(json_escape "$thread_id")" \
+    "$(json_escape "$status")" \
     >> "$logfile" 2>/dev/null || true
 }
 
@@ -809,7 +824,10 @@ cmd_thread_read() {
 
   local tdir
   tdir="$(thread_base)/${thread_id}"
-  [[ -d "${tdir}/messages" ]] || die "thread not found: $thread_id"
+  if [[ ! -d "${tdir}/messages" ]]; then
+    _audit_event thread_missing "${TMUX_PANE:-unknown}" "" 0 "" "$thread_id" missing
+    die "thread not found: $thread_id"
+  fi
 
   local pane_id="${TMUX_PANE:-unknown}"
   local cursor_dir
