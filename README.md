@@ -256,14 +256,15 @@ A CLI to send text to any tmux pane — without copy-paste. Works from your shel
 | `tmux-agent keys <target> <key>...` | Send one or more special keys (Enter, Escape, C-c…) |
 | `tmux-agent message <target> <text>` | Like `type`, but prepends sender info automatically (no Enter) |
 | `tmux-agent thread stat <id>` | Show thread message count and byte size |
+| `tmux-agent thread list [--limit N]` | List recent threads without reading their payloads |
 | `tmux-agent thread read <id> [--since-cursor]` | Read thread messages (all or since last cursor) |
 | `tmux-agent thread read <id> --head N\|--tail N\|--bytes N` | Preview part of a thread without advancing the cursor |
-| `tmux-agent thread gc [--ttl <sec>]` | Remove old threads (default TTL: 3600s) |
+| `tmux-agent thread gc [--ttl <sec>] [--dry-run]` | Remove old threads (default TTL: 3600s) |
 | `tmux-agent pause [reason]` | Block all cross-pane sends (kill switch for runaway loops) |
 | `tmux-agent resume` | Unblock sends |
 | `tmux-agent status` | Show paused / running state |
 | `tmux-agent audit tail [n]` | Show last N audit events for the current session |
-| `tmux-agent audit stats` | Show send / thread counters for the current session |
+| `tmux-agent audit stats` | Show send, thread, and byte counters for the current session |
 | `tmux-agent resolve <label>` | Get the pane ID for a label |
 | `tmux-agent id` | Print your own pane ID |
 | `tmux-agent doctor` | Check tmux connectivity |
@@ -335,6 +336,7 @@ At this point, the receiver can choose:
 
 The receiver reads the thread only when needed:
 ```bash
+tmux-agent thread list --limit 10
 tmux-agent thread stat 20260424T101530Z-1a2b3c4d
 tmux-agent thread read 20260424T101530Z-1a2b3c4d --head 80
 tmux-agent thread read 20260424T101530Z-1a2b3c4d --since-cursor
@@ -342,7 +344,9 @@ tmux-agent thread read 20260424T101530Z-1a2b3c4d --since-cursor
 
 Then replies with `send` or `send --file` to the `reply=` pane from the ping header.
 
-Threads are stored in `${XDG_RUNTIME_DIR:-/tmp/agent-mux-<uid>}/threads/` and cleaned up with `thread gc`.
+Threads are stored in `${XDG_RUNTIME_DIR:-/tmp/agent-mux-<uid>}/threads/`
+or `TMUX_AGENT_THREAD_DIR` when set. List them with `thread list` and clean
+them up with `thread gc`; use `thread gc --dry-run` first to preview removals.
 
 **Why this matters:** with inline transport, the full payload enters the receiver's prompt immediately. With thread transport, only the ping enters the prompt by default; the large body stays on disk until `thread read`.
 
@@ -401,6 +405,7 @@ tmux-agent keys worker Enter
 | Variable | Description |
 |---|---|
 | `TMUX_AGENT_SOCKET` | Override the tmux server socket path (skips auto-detection) |
+| `TMUX_AGENT_THREAD_DIR` | Override thread storage path (default: `${XDG_RUNTIME_DIR:-/tmp/agent-mux-<uid>}/threads`). Useful for persistent, shared, or sandbox-specific thread stores. |
 | `TMUX_AGENT_CURSOR_DIR` | Override cursor storage path (default: `/tmp/agent-mux-<uid>/cursors`). Set this in sandboxed environments where `XDG_RUNTIME_DIR` is read-only. |
 | `TMUX_AGENT_INLINE_THRESHOLD` | Max bytes for inline `send` before auto-spill to file transport (default: `2048`; `0` = always use file transport) |
 

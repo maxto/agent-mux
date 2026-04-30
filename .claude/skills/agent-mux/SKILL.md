@@ -97,9 +97,10 @@ error: must read the pane before interacting. Run: tmux-agent read codex
 | `tmux-agent doctor` | Diagnose tmux connectivity issues | `tmux-agent doctor` |
 | `tmux-agent version` | Print version | `tmux-agent version` |
 | `tmux-agent thread stat <id>` | Show thread message count and byte size | `tmux-agent thread stat abc123` |
+| `tmux-agent thread list [--limit N]` | List recent threads without reading payloads | `tmux-agent thread list --limit 10` |
 | `tmux-agent thread read <id> [--since-cursor]` | Read thread messages (all or since last cursor) | `tmux-agent thread read abc123 --since-cursor` |
 | `tmux-agent thread read <id> --head N\|--tail N\|--bytes N` | Preview a thread without advancing the cursor | `tmux-agent thread read abc123 --head 80` |
-| `tmux-agent thread gc [--ttl <sec>]` | Remove old threads (default TTL: 3600s) | `tmux-agent thread gc --ttl 7200` |
+| `tmux-agent thread gc [--ttl <sec>] [--dry-run]` | Remove old threads (default TTL: 3600s) | `tmux-agent thread gc --ttl 7200 --dry-run` |
 
 ### Target Resolution
 
@@ -182,6 +183,9 @@ tmux-agent send --path codex large-diff.txt
 
 **Receiver reads the thread:**
 ```bash
+# List recent thread IDs without loading payloads
+tmux-agent thread list --limit 10
+
 # Read all messages in the thread
 tmux-agent thread read 20260424T101530Z-1a2b3c4d
 
@@ -198,15 +202,17 @@ tmux-agent thread read 20260424T101530Z-1a2b3c4d --since-cursor
 tmux-agent send --file %4 'Review complete. Found 3 issues...'
 ```
 
-**Thread storage:** `${XDG_RUNTIME_DIR:-/tmp/agent-mux-<uid>}/threads/<thread-id>/`
+**Thread storage:** `${TMUX_AGENT_THREAD_DIR}/<thread-id>/` when set,
+otherwise `${XDG_RUNTIME_DIR:-/tmp/agent-mux-<uid>}/threads/<thread-id>/`
 - `messages/000001.md`, `000002.md` … — message payloads (plain text/markdown)
 - `cursors/<pane-id>` — last-read position per agent, updated atomically
 - `manifest.json` — thread metadata (id, created, sender)
 
 **Cleanup:**
 ```bash
-tmux-agent thread gc            # remove threads older than 1h
-tmux-agent thread gc --ttl 300  # remove threads older than 5 min
+tmux-agent thread gc --dry-run           # preview threads older than 1h
+tmux-agent thread gc                     # remove threads older than 1h
+tmux-agent thread gc --ttl 300 --dry-run # preview threads older than 5 min
 ```
 
 **When to use thread transport vs inline:**
@@ -438,5 +444,6 @@ done
 | Variable | Description |
 |---|---|
 | `TMUX_AGENT_SOCKET` | Override the tmux server socket path (skips auto-detection) |
+| `TMUX_AGENT_THREAD_DIR` | Override thread storage directory (default: `${XDG_RUNTIME_DIR:-/tmp/agent-mux-<uid>}/threads`). Useful for persistent, shared, or sandbox-specific thread stores. |
 | `TMUX_AGENT_CURSOR_DIR` | Override cursor storage directory (default: `/tmp/agent-mux-<uid>/cursors`). Useful in sandboxed environments where `XDG_RUNTIME_DIR` is read-only. |
 | `TMUX_AGENT_INLINE_THRESHOLD` | Max bytes for inline `send` before auto-spill to file transport (default: `2048`; `0` = always use file transport) |

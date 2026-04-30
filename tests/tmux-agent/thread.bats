@@ -162,6 +162,45 @@ teardown() {
   [[ "$output" == *"created: 2026-01-01T00:00:00Z"* ]]
 }
 
+@test "thread list: shows recent threads with metadata" {
+  TDIR=$(make_thread "t-list")
+  printf '{"id":"t-list","created":"2026-01-01T00:00:00Z","from":"alice"}\n' > "${TDIR}/manifest.json"
+  printf 'abcdef' > "${TDIR}/messages/000001.md"
+
+  run bash "$TMUX_AGENT" thread list
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"THREAD"* ]]
+  [[ "$output" == *"t-list"* ]]
+  [[ "$output" == *"alice"* ]]
+  [[ "$output" == *"2026-01-01T00:00:00Z"* ]]
+}
+
+@test "thread list: respects --limit" {
+  make_thread "t-list-1" > /dev/null
+  printf 'one' > "${THREADS_DIR}/t-list-1/messages/000001.md"
+  touch -d "20 seconds ago" "${THREADS_DIR}/t-list-1/messages/000001.md" "${THREADS_DIR}/t-list-1"
+
+  make_thread "t-list-2" > /dev/null
+  printf 'two' > "${THREADS_DIR}/t-list-2/messages/000001.md"
+
+  run bash "$TMUX_AGENT" thread list --limit 1
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"t-list-2"* ]]
+  [[ "$output" != *"t-list-1"* ]]
+}
+
+@test "thread commands use TMUX_AGENT_THREAD_DIR when set" {
+  export TMUX_AGENT_THREAD_DIR="$BATS_TMPDIR/custom-threads-$$-$BATS_TEST_NUMBER"
+  THREADS_DIR="$TMUX_AGENT_THREAD_DIR"
+  TDIR=$(make_thread "t-custom-dir")
+  printf 'custom' > "${TDIR}/messages/000001.md"
+
+  run bash "$TMUX_AGENT" thread stat "t-custom-dir"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"id: t-custom-dir"* ]]
+  [ -d "$TMUX_AGENT_THREAD_DIR/t-custom-dir" ]
+}
+
 @test "thread read: --head returns only first N lines and does not advance cursor" {
   TDIR=$(make_thread "t-head")
   printf 'one\ntwo\nthree\n' > "${TDIR}/messages/000001.md"
@@ -211,6 +250,34 @@ teardown() {
   run bash "$TMUX_AGENT" thread read "t-partial-since" --since-cursor --bytes 1
   [ "$status" -ne 0 ]
   [[ "$output" == *"cannot be combined"* ]]
+}
+
+@test "thread read: full read audit records bytes printed" {
+  TDIR=$(make_thread "t-audit-bytes")
+  printf 'abc' > "${TDIR}/messages/000001.md"
+  printf 'defg' > "${TDIR}/messages/000002.md"
+
+  run bash "$TMUX_AGENT" thread read "t-audit-bytes"
+  [ "$status" -eq 0 ]
+
+  local logfile; logfile="$(audit_log_for_test)"
+  [ -f "$logfile" ]
+  grep -q '"event":"thread_read"' "$logfile"
+  grep -q '"bytes":7' "$logfile"
+}
+
+@test "thread read: partial read audit records bytes printed" {
+  TDIR=$(make_thread "t-audit-partial-bytes")
+  printf 'abcdefghij' > "${TDIR}/messages/000001.md"
+
+  run bash "$TMUX_AGENT" thread read "t-audit-partial-bytes" --bytes 5
+  [ "$status" -eq 0 ]
+  [ "$output" = "abcde" ]
+
+  local logfile; logfile="$(audit_log_for_test)"
+  [ -f "$logfile" ]
+  grep -q '"event":"thread_read"' "$logfile"
+  grep -q '"bytes":5' "$logfile"
 }
 
 # ── thread gc ────────────────────────────────────────────────────────────────
@@ -290,6 +357,18 @@ teardown() {
   [ ! -d "${THREADS_DIR}/t-remove" ]
 }
 
+@test "thread gc: --dry-run reports but does not remove threads" {
+  TDIR=$(make_thread "t-dry-run-remove")
+  printf 'old' > "${TDIR}/messages/000001.md"
+  touch -d "20 seconds ago" "${TDIR}/messages/000001.md" "$TDIR"
+
+  run bash "$TMUX_AGENT" thread gc --ttl 10 --dry-run
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"would remove: t-dry-run-remove"* ]]
+  [[ "$output" == *"would remove 1 thread"* ]]
+  [ -d "$TDIR" ]
+}
+
 @test "thread gc: cleans up orphaned cursor dirs" {
   # Create a thread, read it (creates cursor dir), then remove the thread manually
   TDIR=$(make_thread "t-orphan")
@@ -306,6 +385,17 @@ teardown() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"cleaned 1"* ]]
   [ ! -d "$CURSOR_DIR" ]
+}
+
+@test "thread gc: --dry-run reports but does not clean orphaned cursor dirs" {
+  mkdir -p "$THREADS_DIR"
+  mkdir -p "${TMUX_AGENT_CURSOR_DIR}/missing-thread"
+
+  run bash "$TMUX_AGENT" thread gc --ttl 9999 --dry-run
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"would clean cursor: missing-thread"* ]]
+  [[ "$output" == *"would clean 1 orphaned cursor dir"* ]]
+  [ -d "${TMUX_AGENT_CURSOR_DIR}/missing-thread" ]
 }
 
 # ── thread subcommand errors ─────────────────────────────────────────────────

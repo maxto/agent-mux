@@ -69,7 +69,27 @@ _logfile() {
   run bash "$TMUX_AGENT" audit stats
   [ "$status" -eq 0 ]
   [[ "$output" == *"sends:"* ]]
-  [[ "$output" == *"bytes:"* ]]
+  [[ "$output" == *"inline_bytes:"* ]]
+  [[ "$output" == *"thread_bytes:"* ]]
+  [[ "$output" == *"thread_read_bytes:"* ]]
+}
+
+@test "audit stats separates inline, thread, and thread read bytes" {
+  bash "$TMUX_AGENT" send "$TEST_PANE" "inline"
+  export TMUX_AGENT_INLINE_THRESHOLD=0
+  run bash "$TMUX_AGENT" send "$TEST_PANE" "thread-payload"
+  [ "$status" -eq 0 ]
+  local thread_id
+  thread_id=$(printf '%s' "$output" | sed -n 's/^thread: //p')
+  [ -n "$thread_id" ]
+
+  bash "$TMUX_AGENT" thread read "$thread_id" >/dev/null
+
+  run bash "$TMUX_AGENT" audit stats
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"inline_bytes:       6"* ]]
+  [[ "$output" == *"thread_bytes:       14"* ]]
+  [[ "$output" == *"thread_read_bytes:  14"* ]]
 }
 
 @test "pause and resume events are logged" {

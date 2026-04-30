@@ -3,7 +3,7 @@
 # Any tool that can run bash can use this to talk to other panes.
 set -euo pipefail
 
-VERSION="1.7.2"
+VERSION="1.8.0"
 
 # --- Helpers ---
 
@@ -43,7 +43,7 @@ clear_read() {
 thread_base() {
   local uid
   uid=$(id -u)
-  echo "${XDG_RUNTIME_DIR:-/tmp/agent-mux-${uid}}/threads"
+  echo "${TMUX_AGENT_THREAD_DIR:-${XDG_RUNTIME_DIR:-/tmp/agent-mux-${uid}}/threads}"
 }
 
 # Cursor storage is always local to the reading agent — separate from thread
@@ -347,9 +347,10 @@ Commands:
   send --path <target> <file>              File-based transport, streams bytes from <file>
                                            (preserves trailing newlines and binary content)
   thread stat <id>                         Show thread message count and byte size
+  thread list [--limit N]                  List recent threads
   thread read <id> [--since-cursor]        Read thread messages (all or since cursor)
   thread read <id> --head N|--tail N|--bytes N
-  thread gc [--ttl <sec>]                  Remove old threads (default TTL: 3600s)
+  thread gc [--ttl <sec>] [--dry-run]      Remove old threads (default TTL: 3600s)
 
 Target resolution:
   Targets can be tmux native (session:window.pane, %N) or a label set via 'name'.
@@ -357,6 +358,7 @@ Target resolution:
 
 Environment:
   TMUX_AGENT_SOCKET            Override the tmux server socket path (skips auto-detection)
+  TMUX_AGENT_THREAD_DIR        Override thread storage directory (default: XDG_RUNTIME_DIR/threads)
   TMUX_AGENT_INLINE_THRESHOLD  Max bytes for inline send before auto-spill to file transport (default: 2048; 0 = always file)
 EOF
   exit 0
@@ -590,7 +592,7 @@ _send_thread() {
     payload_bytes=$(file_size "$src")
   else
     check_header_injection "$src"
-    payload_bytes=${#src}
+    payload_bytes=$(printf '%s' "$src" | wc -c)
   fi
 
   # Write message atomically — ping is sent ONLY after successful write
@@ -759,10 +761,11 @@ cmd_thread() {
   shift || true
   case "$subcmd" in
     read) cmd_thread_read "$@" ;;
+    list) cmd_thread_list "$@" ;;
     stat) cmd_thread_stat "$@" ;;
     gc)   cmd_thread_gc "$@" ;;
-    "")   die "thread requires a subcommand: read, stat, gc" ;;
-    *)    die "unknown thread subcommand: $subcmd. Use: read, stat, gc" ;;
+    "")   die "thread requires a subcommand: read, list, stat, gc" ;;
+    *)    die "unknown thread subcommand: $subcmd. Use: read, list, stat, gc" ;;
   esac
 }
 
@@ -795,6 +798,75 @@ cmd_thread_stat() {
   echo "bytes: $bytes"
   [[ -n "$from" ]] && echo "from: $from"
   [[ -n "$created" ]] && echo "created: $created"
+}
+
+thread_message_stats() {
+  local tdir="$1" count=0 bytes=0 msg
+  for msg in "${tdir}/messages/"*.md; do
+    [[ -f "$msg" ]] || continue
+    (( count++ )) || true
+    bytes=$(( bytes + $(file_size "$msg") ))
+  done
+  printf '%s %s\n' "$count" "$bytes"
+}
+
+cmd_thread_list() {
+  local limit=20
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --limit)
+        shift
+        [[ $# -gt 0 ]] || die "--limit requires a value"
+        require_nonnegative_integer "$1" "--limit"
+        limit="$1"
+        ;;
+      *) die "unknown option: $1" ;;
+    esac
+    shift
+  done
+
+  local base
+  base=$(thread_base)
+  [[ -d "$base" ]] || { echo "(no threads)"; return 0; }
+
+  local rows="" tdir id latest msg
+  for tdir in "${base}"/*/; do
+    tdir="${tdir%/}"
+    [[ -d "${tdir}/messages" ]] || continue
+    id=$(basename "$tdir")
+    latest=$(file_mtime "$tdir")
+    for msg in "${tdir}/messages/"*.md; do
+      [[ -f "$msg" ]] || continue
+      local mt
+      mt=$(file_mtime "$msg")
+      (( mt > latest )) && latest=$mt
+    done
+    rows+="${latest} ${id}"$'\n'
+  done
+
+  [[ -n "$rows" ]] || { echo "(no threads)"; return 0; }
+
+  printf "%-32s %8s %6s %-20s %s\n" "THREAD" "BYTES" "MSGS" "FROM" "CREATED"
+  local printed=0 line manifest from created stats count bytes
+  while IFS= read -r line; do
+    [[ -n "$line" ]] || continue
+    id="${line#* }"
+    tdir="${base}/${id}"
+    manifest="${tdir}/manifest.json"
+    from=""
+    created=""
+    if [[ -f "$manifest" ]]; then
+      from=$(sed -n 's/.*"from":"\([^"]*\)".*/\1/p' "$manifest" | head -1)
+      created=$(sed -n 's/.*"created":"\([^"]*\)".*/\1/p' "$manifest" | head -1)
+    fi
+    stats=$(thread_message_stats "$tdir")
+    count="${stats%% *}"
+    bytes="${stats##* }"
+    printf "%-32s %8s %6s %-20s %s\n" "$id" "$bytes" "$count" "${from:--}" "${created:--}"
+    (( printed++ )) || true
+    (( limit > 0 && printed >= limit )) && break
+  done < <(printf '%s' "$rows" | sort -rn)
+  return 0
 }
 
 cmd_thread_read() {
@@ -853,17 +925,31 @@ cmd_thread_read() {
   done
 
   if [[ -n "$limit_mode" ]]; then
-    (( ${#msg_files[@]} > 0 )) || return 0
+    if (( ${#msg_files[@]} == 0 )); then
+      _audit_event thread_read "${TMUX_PANE:-unknown}" "" 0 "" "$thread_id"
+      return 0
+    fi
+    local tmp_out read_bytes
+    tmp_out=$(mktemp)
     case "$limit_mode" in
-      head)  ( set +o pipefail; cat "${msg_files[@]}" | head -n "$limit_value" ) ;;
-      tail)  cat "${msg_files[@]}" | tail -n "$limit_value" ;;
-      bytes) ( set +o pipefail; cat "${msg_files[@]}" | head -c "$limit_value" ) ;;
+      head)  ( set +o pipefail; cat "${msg_files[@]}" | head -n "$limit_value" > "$tmp_out" ) ;;
+      tail)  cat "${msg_files[@]}" | tail -n "$limit_value" > "$tmp_out" ;;
+      bytes) ( set +o pipefail; cat "${msg_files[@]}" | head -c "$limit_value" > "$tmp_out" ) ;;
     esac
+    cat "$tmp_out"
+    read_bytes=$(file_size "$tmp_out")
+    rm -f "$tmp_out"
+    _audit_event thread_read "${TMUX_PANE:-unknown}" "" "$read_bytes" "" "$thread_id"
     return 0
   fi
 
+  local read_bytes=0
   if (( ${#msg_files[@]} > 0 )); then
     cat "${msg_files[@]}"
+    local read_file
+    for read_file in "${msg_files[@]}"; do
+      read_bytes=$(( read_bytes + $(file_size "$read_file") ))
+    done
   fi
 
   if (( last_seq > 0 )); then
@@ -872,17 +958,19 @@ cmd_thread_read() {
     printf '%06d' "$last_seq" > "$tmp"
     mv "$tmp" "$cursor_file"
   fi
-  _audit_event thread_read "${TMUX_PANE:-unknown}" "" 0 "" "$thread_id"
+  _audit_event thread_read "${TMUX_PANE:-unknown}" "" "$read_bytes" "" "$thread_id"
 }
 
 cmd_thread_gc() {
-  local ttl=3600
+  local ttl=3600 dry_run=false
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --ttl) ttl="$2"; shift 2 ;;
+      --dry-run) dry_run=true; shift ;;
       *) die "unknown option: $1" ;;
     esac
   done
+  require_nonnegative_integer "$ttl" "--ttl"
 
   local base
   base=$(thread_base)
@@ -905,7 +993,10 @@ cmd_thread_gc() {
           lp=$(cat "$pid_file" 2>/dev/null || true)
           [[ -n "$lp" ]] && kill -0 "$lp" 2>/dev/null && lock_alive=true
         fi
-        if ! $lock_alive; then rm -rf "$lock_dir"; (( broken++ )) || true; fi
+        if ! $lock_alive; then
+          if ! $dry_run; then rm -rf "$lock_dir"; fi
+          (( broken++ )) || true
+        fi
       fi
     fi
 
@@ -919,7 +1010,11 @@ cmd_thread_gc() {
     done
 
     if (( now - latest > ttl )); then
-      rm -rf "$tdir"
+      if $dry_run; then
+        echo "would remove: $(basename "$tdir")"
+      else
+        rm -rf "$tdir"
+      fi
       (( removed++ )) || true
     fi
   done
@@ -934,13 +1029,21 @@ cmd_thread_gc() {
       local tid
       tid=$(basename "$cdir")
       if [[ ! -d "${base}/${tid}" ]]; then
-        rm -rf "$cdir"
+        if $dry_run; then
+          echo "would clean cursor: $tid"
+        else
+          rm -rf "$cdir"
+        fi
         (( orphaned++ )) || true
       fi
     done
   fi
 
-  echo "gc: removed ${removed} thread(s), broke ${broken} stale lock(s), cleaned ${orphaned} orphaned cursor dir(s)"
+  if $dry_run; then
+    echo "gc: would remove ${removed} thread(s), would break ${broken} stale lock(s), would clean ${orphaned} orphaned cursor dir(s)"
+  else
+    echo "gc: removed ${removed} thread(s), broke ${broken} stale lock(s), cleaned ${orphaned} orphaned cursor dir(s)"
+  fi
 }
 
 cmd_audit() {
@@ -972,17 +1075,24 @@ cmd_audit() {
         return 0
       fi
       awk '{
-        if (/\"event\":\"send\"/)         sends++
-        if (/\"event\":\"thread_create\"/) threads++
+        bytes = 0
         if (/\"bytes\":([0-9]+)/) {
-          match($0, /"bytes":([0-9]+)/, a); bytes += a[1]
+          match($0, /"bytes":([0-9]+)/, a); bytes = a[1]
         }
+        if (/\"event\":\"send\"/) {
+          sends++
+          if (/\"transport\":\"inline\"/) inline_bytes += bytes
+          if (/\"transport\":\"thread\"/) thread_bytes += bytes
+        }
+        if (/\"event\":\"thread_create\"/) threads++
+        if (/\"event\":\"thread_read\"/)   thread_read_bytes += bytes
         if (/header_guard_block/)         blocked++
         if (/\"event\":\"pause\"/)        pauses++
       }
       END {
-        printf "session:  %s\nsends:    %d\nthreads:  %d\nbytes:    %d\nblocked:  %d\npauses:   %d\n",
-          FILENAME, sends+0, threads+0, bytes+0, blocked+0, pauses+0
+        printf "session:           %s\nsends:             %d\nthreads:           %d\ninline_bytes:       %d\nthread_bytes:       %d\nthread_read_bytes:  %d\nblocked:           %d\npauses:            %d\n",
+          FILENAME, sends+0, threads+0, inline_bytes+0, thread_bytes+0,
+          thread_read_bytes+0, blocked+0, pauses+0
       }' "$logfile"
       ;;
     *) die "audit: unknown subcommand '$sub'. Use: tail [n], grep <pattern>, stats" ;;
@@ -997,7 +1107,7 @@ case "$1" in
   id)        shift; cmd_id "$@"; exit ;;
   -h|--help|help) usage ;;
   version)   echo "tmux-agent $VERSION"; exit ;;
-  thread)    shift; cmd_thread "$@"; exit ;;
+  thread)    shift; init_socket 2>/dev/null || true; cmd_thread "$@"; exit ;;
   threshold) inline_threshold; exit ;;
   pause)     shift; cmd_pause  "$@"; exit ;;
   resume)    shift; cmd_resume "$@"; exit ;;

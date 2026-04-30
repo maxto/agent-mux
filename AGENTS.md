@@ -32,7 +32,7 @@ History uses Conventional Commit-style prefixes such as `feat:`, `fix:`, `docs:`
 
 ## Versioning Guidelines
 
-Current version is `1.7.2`. Use conservative semantic versioning: bump `PATCH` (`0.0.1`) by default for fixes, docs, tests, hardening, and small tweaks; bump `MINOR` (`0.1.0`) only for new public commands or compatible capabilities with tests and updated docs; bump `MAJOR` (`1.0.0`) only for breaking CLI, protocol, storage, or install changes. Because the project is already in the `1.x` line, the next breaking release would be `2.0.0`. Update both `install.sh` and `scripts/tmux-agent` when changing the version.
+Current version is `1.8.0`. Use conservative semantic versioning: bump `PATCH` (`0.0.1`) by default for fixes, docs, tests, hardening, and small tweaks; bump `MINOR` (`0.1.0`) only for new public commands or compatible capabilities with tests and updated docs; bump `MAJOR` (`1.0.0`) only for breaking CLI, protocol, storage, or install changes. Because the project is already in the `1.x` line, the next breaking release would be `2.0.0`. Update both `install.sh` and `scripts/tmux-agent` when changing the version.
 
 ## Agent-Specific Instructions
 
