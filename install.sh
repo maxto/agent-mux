@@ -143,7 +143,7 @@ session_usage() {
 agent-mux session — bootstrap a tmux layout for multi-agent work
 
 Usage:
-  agent-mux session [start] [--name <session>] [--labels a,b,c] [--cmds x,y,z]
+  agent-mux session start [--name <session>] [--labels a,b,c] [--cmds x,y,z]
   agent-mux session list
   agent-mux session kill --name <session>
 
@@ -152,10 +152,11 @@ Defaults:
   --labels coordinator,worker1,worker2
 
 Behavior:
+  Running 'agent-mux session' without a subcommand is safe: it only prints this help.
   Labels may contain any number of panes. Commands are optional and must match label count.
   --cmds is comma-separated; commands containing literal commas are not supported.
-  Inside tmux, run from the pane you want as the first label; missing panes are created.
-  Outside tmux, creates the session if needed and attaches to it.
+  Outside tmux: creates and labels the session (without attaching). Use 'agent-mux attach' to enter it.
+  Inside tmux: run from the pane you want as the first label; missing panes are created as splits.
 EOF
 }
 
@@ -263,9 +264,8 @@ cmd_session_start_inside() {
 cmd_session_start_outside() {
   local session_name="$1"
   if tmux_cmd has-session -t "$session_name" 2>/dev/null; then
-    info "Session '$session_name' already exists; attaching without modifying it."
+    info "Session '$session_name' already exists. Run: agent-mux attach $session_name"
     echo "Run 'agent-mux session start' inside tmux to apply labels if needed."
-    tmux_cmd attach-session -t "$session_name"
     return
   fi
 
@@ -290,8 +290,7 @@ cmd_session_start_outside() {
   launch_session_commands
   print_session_layout
 
-  info "Created tmux session '$session_name'."
-  tmux_cmd attach-session -t "$session_name"
+  info "Created tmux session '$session_name'. Run: agent-mux attach $session_name"
 }
 
 cmd_session_list() {
@@ -376,15 +375,54 @@ cmd_session_start() {
   fi
 }
 
+cmd_attach() {
+  local session_name="agents"
+  local name_set=false
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --name)
+        shift
+        [[ $# -gt 0 ]] || error "--name requires a session name"
+        $name_set && error "attach accepts only one session name"
+        session_name="$1"
+        name_set=true
+        ;;
+      -*)
+        error "Unknown attach option: $1. Run 'agent-mux attach [--name <session>]'."
+        ;;
+      *)
+        $name_set && error "attach accepts only one session name"
+        session_name="$1"
+        name_set=true
+        ;;
+    esac
+    shift
+  done
+
+  [[ "$session_name" =~ ^[A-Za-z0-9._-]+$ ]] || error "invalid session name '$session_name'"
+  require_tmux_binary
+  tmux_cmd has-session -t "$session_name" 2>/dev/null || error "session not found: $session_name"
+
+  if current_tmux_pane >/dev/null 2>&1; then
+    tmux_cmd switch-client -t "$session_name"
+  else
+    tmux_cmd attach-session -t "$session_name"
+  fi
+}
+
 cmd_session() {
   if [[ "${1:-}" == "help" || "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     session_usage
     return
   fi
 
-  if [[ $# -eq 0 || "${1:-}" == --* ]]; then
-    cmd_session_start "$@"
+  if [[ $# -eq 0 ]]; then
+    session_usage
     return
+  fi
+
+  if [[ "${1:-}" == --* ]]; then
+    error "session options require an explicit subcommand. Run: agent-mux session start $*"
   fi
 
   local subcmd="$1"
@@ -630,12 +668,15 @@ Commands:
                                        and symlinks it to ~/.config/tmux/tmux.conf.
                                        Your existing config is backed up to ~/.agent-mux/backups/.
   update                    Update tmux-agent, agent-mux CLI, and tmux.conf to latest
-  session [start]           Create/attach a tmux session layout with labeled panes
+  session start             Create a tmux session layout with labeled panes (no auto-attach)
     [--name <session>]        Default session name: agents
     [--labels a,b,c]          One pane per label; default: coordinator,worker1,worker2
     [--cmds x,y,z]            Optional command per pane; count must match labels
   session list              List tmux sessions
   session kill --name <s>   Kill a specific tmux session
+  attach [<session>]        Attach to a session by name (default: agents)
+    [--name <session>]        Inside tmux: uses switch-client; outside: attach-session
+  open [<session>]          Alias for attach; does not create sessions
   (tmux-agent commands — safety and observability)
   tmux-agent pause [reason] Pause all cross-pane sends
   tmux-agent resume         Resume sends after pause
@@ -675,6 +716,7 @@ case "${1:-}" in
   install)                         cmd_install "${@:2}" ;;
   update)                          cmd_update ;;
   session)                         cmd_session "${@:2}" ;;
+  attach|open)                     cmd_attach "${@:2}" ;;
   uninstall|remove)                cmd_uninstall ;;
   version|--version|-v|-V)         cmd_version ;;
   help|cheatsheet|cheat|keys)      cmd_help ;;

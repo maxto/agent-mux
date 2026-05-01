@@ -7,7 +7,7 @@ metadata:
 
 # agent-mux
 
-Tmux pane control and cross-pane agent communication. Use `tmux-agent` (the high-level CLI) for all cross-pane interactions. Fall back to raw tmux commands only when you need low-level control.
+Tmux pane control and cross-pane agent communication. Use `tmux-agent` (the high-level CLI) for all cross-pane interactions. Use `agent-mux` for session and layout management. Fall back to raw tmux commands only when you need low-level control not covered by these CLIs.
 
 ## Coordination Contract
 
@@ -30,11 +30,18 @@ This skill is the durable protocol. If the chat is long, re-read this section be
 [ -n "$TMUX" ] && echo "in tmux ✓" || echo "NOT in tmux — cross-pane workflows will not work"
 ```
 
-**If you are NOT in tmux:** use `agent-mux session` to create a labeled tmux
-layout, then launch or attach your agent from inside it:
+**If you are NOT in tmux:** create a session with `agent-mux session start`, then attach:
 
 ```bash
 agent-mux session start --name agents --labels coordinator,worker1,worker2
+agent-mux attach agents          # enter the session (attach-session outside tmux)
+```
+
+To re-attach to an existing session:
+
+```bash
+agent-mux attach                 # defaults to session named "agents"
+agent-mux attach --name local    # or by name
 ```
 
 **If tmux is running but you are outside a pane** (e.g. a detached process), set the socket explicitly — subcommands like `list` and `doctor` work this way:
@@ -52,6 +59,27 @@ agent-mux session start --name local --labels qwen,deepseek,kimi --cmds qwen,dee
 agent-mux session list
 agent-mux session kill --name local
 ```
+
+## Adding Panes (New Terminals)
+
+When the user asks you to "open a new terminal", "add a pane", or "open two terminals", do it **within the current agent-mux session** — not with raw tmux windows or separate sessions.
+
+From **inside a tmux pane**, run `agent-mux session start` with the labels you need. It uses the current pane as the first label and splits new panes for the rest:
+
+```bash
+# Add two panes (current pane becomes "main", two new splits created)
+agent-mux session start --labels main,worker1,worker2
+
+# Add a single extra pane labeled "debug"
+agent-mux session start --labels current,debug
+```
+
+After splitting, label any unlabeled pane with:
+```bash
+tmux-agent name <pane-id> <label>
+```
+
+Do **not** use `tmux split-window`, `tmux new-window`, or `tmux new-session` directly for user-requested terminals — go through `agent-mux` so panes are labeled and visible to `tmux-agent`.
 
 ## tmux-agent — Cross-Pane Communication
 
@@ -371,6 +399,10 @@ tmux send-keys -t shared Enter
 
 ### Panes and Windows
 
+Prefer `agent-mux session start --labels ...` for user-requested panes inside an
+agent-mux session. Use raw tmux commands here only as low-level reference when
+agent-mux does not cover the operation you intentionally need.
+
 ```bash
 # Create panes (prefer over new windows)
 tmux split-window -h -t SESSION              # Horizontal split
@@ -384,6 +416,9 @@ tmux list-windows -t shared
 ```
 
 ### Session Management
+
+Prefer `agent-mux session start`, `agent-mux attach`, and `agent-mux open` for
+agent-mux-managed sessions. Raw tmux session commands are an escape hatch.
 
 ```bash
 tmux list-sessions

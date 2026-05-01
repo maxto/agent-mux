@@ -33,11 +33,9 @@ Large handoffs between agents no longer inflate the prompt. When a payload excee
 curl -fsSL https://maxto.github.io/agent-mux/install.sh | bash
 source ~/.bashrc   # or open a new terminal
 
-# 2. Start a tmux session (tmux-agent only works inside tmux)
-tmux new-session -s agents
-
-# Optional: create a labeled coordinator/worker layout
-agent-mux session
+# 2. Create a labeled agent-mux session, then enter it
+agent-mux session start --name agents --labels coordinator,worker1,worker2
+agent-mux attach agents
 
 # 3. Install the skill — once per project
 cd your-project
@@ -178,9 +176,12 @@ Installs the agent-mux tmux config, backs up your existing one to `~/.agent-mux/
 | `agent-mux install --with-config` | Also install the tmux config, symlinked to `~/.config/tmux/tmux.conf` (existing config backed up to `~/.agent-mux/backups/`) |
 | `agent-mux install --project-dir <path>` | Install the skill into `<path>` instead of `$PWD` |
 | `agent-mux update` | Re-download tmux-agent and agent-mux CLI; refreshes tmux config only if `--with-config` was previously used; refreshes skill if present in `$PWD` |
-| `agent-mux session [start] [--name agents] [--labels a,b,c] [--cmds x,y,z]` | Create or attach a tmux session with one pane per label; commands are optional |
+| `agent-mux session` | Show session help; does not create panes or attach |
+| `agent-mux session start [--name agents] [--labels a,b,c] [--cmds x,y,z]` | Create a tmux session layout with one pane per label; commands are optional; does not attach |
 | `agent-mux session list` | List tmux sessions |
 | `agent-mux session kill --name <session>` | Kill a specific tmux session |
+| `agent-mux attach [session]` | Attach or switch to an existing session; default: `agents` |
+| `agent-mux open [session]` | Alias for `attach`; does not create sessions |
 | `agent-mux uninstall` | Remove `~/.agent-mux/`, restore previous tmux config from backup (if available). Note: does not remove the `PATH` line added to your shell rc file. |
 | `agent-mux version` | Print version |
 | `agent-mux help` | Show tmux-agent and keybinding cheatsheet |
@@ -409,12 +410,16 @@ tmux-agent keys worker Enter
 | `TMUX_AGENT_CURSOR_DIR` | Override cursor storage path (default: `/tmp/agent-mux-<uid>/cursors`). Set this in sandboxed environments where `XDG_RUNTIME_DIR` is read-only. |
 | `TMUX_AGENT_INLINE_THRESHOLD` | Max bytes for inline `send` before auto-spill to file transport (default: `2048`; `0` = always use file transport) |
 
-### Useful tmux commands
+### Useful low-level tmux commands
+
+Prefer `agent-mux session start`, `agent-mux attach`, and `agent-mux open` for
+agent-mux-managed sessions. Use raw tmux commands only when you intentionally
+need tmux behavior outside the agent-mux workflow.
 
 | Command | Description |
 |---|---|
-| `tmux new-session -s agents` | Create a new session named `agents` |
-| `tmux attach -t agents` | Reattach to session `agents` |
+| `tmux new-session -s agents` | Create a raw tmux session named `agents` |
+| `tmux attach -t agents` | Reattach to raw tmux session `agents` |
 | `tmux list-sessions` | List all active sessions |
 | `tmux kill-session -t agents` | Kill session `agents` |
 

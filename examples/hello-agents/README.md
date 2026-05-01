@@ -12,7 +12,7 @@ The commands below are what the coordinator executes — you don't type them.
 
 - agent-mux installed — `curl -fsSL https://maxto.github.io/agent-mux/install.sh | bash`
 - Claude Code, Codex CLI, and Gemini CLI in your PATH
-- A tmux session running — `tmux new-session -s agents`
+- An agent-mux session running — `agent-mux session start --name agents --labels claude,codex,gemini && agent-mux attach agents`
 
 ## Run it
 
@@ -24,11 +24,7 @@ Claude will execute:
 
 ```bash
 # Create panes and label them
-tmux split-window -h
-tmux split-window -v
-tmux-agent name "$(tmux-agent id)" claude
-tmux-agent name %2 codex
-tmux-agent name %3 gemini
+agent-mux session start --labels claude,codex,gemini
 
 # Launch agents
 tmux-agent read codex && tmux-agent type codex "codex" && tmux-agent read codex && tmux-agent keys codex Enter

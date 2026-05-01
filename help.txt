@@ -19,12 +19,17 @@ tmux-agent
 
 agent-mux
 
-  session               create/attach labeled pane layout
-  session --name <s>    use a custom tmux session name
-  session --labels a,b,c
+  session               show session help; does not create panes
+  session start         create labeled pane layout without attaching
+  session start --name <s>
+                        use a custom tmux session name
+  session start --labels a,b,c
                         create one pane per label
-  session --cmds x,y,z  launch one command per pane
+  session start --cmds x,y,z
+                        launch one command per pane
                         commands cannot contain literal commas
+  attach [s]            attach/switch to an existing session
+  open [s]              alias for attach; does not create sessions
   session list          list tmux sessions
   session kill --name s kill a specific session
 

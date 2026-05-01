@@ -16,8 +16,17 @@ teardown() {
   rm -f "$SOCKET"
 }
 
-@test "agent-mux session creates three labeled panes inside tmux" {
+@test "agent-mux session without subcommand does not create panes inside tmux" {
   run bash "$INSTALL_SH" session
+  [ "$status" -eq 0 ]
+
+  count=$(tmux -S "$SOCKET" list-panes -t session_bootstrap -F '#{pane_id}' | wc -l | tr -d ' ')
+  [ "$count" -eq 1 ]
+  [[ "$output" == *"agent-mux session"* ]]
+}
+
+@test "agent-mux session start creates three labeled panes inside tmux" {
+  run bash "$INSTALL_SH" session start
   [ "$status" -eq 0 ]
 
   count=$(tmux -S "$SOCKET" list-panes -t session_bootstrap -F '#{pane_id}' | wc -l | tr -d ' ')
@@ -29,16 +38,16 @@ teardown() {
   [[ "$labels" == *"worker2"* ]]
 }
 
-@test "agent-mux session is idempotent for existing labeled workers" {
-  bash "$INSTALL_SH" session >/dev/null
-  bash "$INSTALL_SH" session >/dev/null
+@test "agent-mux session start is idempotent for existing labeled workers" {
+  bash "$INSTALL_SH" session start >/dev/null
+  bash "$INSTALL_SH" session start >/dev/null
 
   count=$(tmux -S "$SOCKET" list-panes -t session_bootstrap -F '#{pane_id}' | wc -l | tr -d ' ')
   [ "$count" -eq 3 ]
 }
 
-@test "agent-mux session applies custom labels inside tmux" {
-  run bash "$INSTALL_SH" session --labels lead,reviewer,tester,bash
+@test "agent-mux session start applies custom labels inside tmux" {
+  run bash "$INSTALL_SH" session start --labels lead,reviewer,tester,bash
   [ "$status" -eq 0 ]
 
   count=$(tmux -S "$SOCKET" list-panes -t session_bootstrap -F '#{pane_id}' | wc -l | tr -d ' ')
