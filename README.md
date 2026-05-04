@@ -199,7 +199,8 @@ agent-mux install --config=false
 | `agent-mux open [session]` | Alias for `attach`; does not create sessions |
 | `agent-mux uninstall` | Remove `~/.agent-mux/`, restore previous tmux config file or symlink from backup when available. Note: does not remove the `PATH` line added to your shell rc file. |
 | `agent-mux version` | Print version |
-| `agent-mux help` | Show tmux-agent and keybinding cheatsheet |
+| `agent-mux help` / `agent-mux --help` | Show the agent-mux CLI reference |
+| `agent-mux cheatsheet` / `agent-mux keys` | Show tmux-agent quick reference and tmux keybindings |
 
 ### Files
 

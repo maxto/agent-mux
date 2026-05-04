@@ -1,4 +1,6 @@
-tmux-agent
+agent-mux cheatsheet
+
+tmux-agent quick reference
 
   list                  show all panes
   send <t> <msg>        send message to pane

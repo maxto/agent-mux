@@ -70,3 +70,21 @@ teardown() {
   count=$(grep -c '.agent-mux/bin' "$HOME/.bashrc")
   [ "$count" -eq 1 ]
 }
+
+@test "help shows CLI reference, not cheatsheet" {
+  run bash "$INSTALL_SH" help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Usage: agent-mux"* ]]
+  [[ "$output" == *"cheatsheet, cheat, keys"* ]]
+  [[ "$output" != *"pane navigation"* ]]
+}
+
+@test "cheatsheet shows tmux-agent and keybinding quick reference" {
+  mkdir -p "$HOME/.agent-mux"
+  cp "$BATS_TEST_DIRNAME/../../help.txt" "$HOME/.agent-mux/help.txt"
+
+  run bash "$INSTALL_SH" cheatsheet
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"tmux-agent quick reference"* ]]
+  [[ "$output" == *"pane navigation"* ]]
+}

@@ -2,7 +2,7 @@
 # agent-mux — one-command tmux setup
 set -euo pipefail
 
-VERSION="1.9.1"
+VERSION="1.9.2"
 REPO="maxto/agent-mux"
 BRANCH="v${VERSION}"
 BASE_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
@@ -564,6 +564,7 @@ cmd_global_install() {
   echo ""
   echo "  Next: cd your-project && agent-mux install"
   echo "  Then: agent-mux help"
+  echo "  Keys: agent-mux cheatsheet"
   if ! echo "$PATH" | tr ':' '\n' | grep -qx "$BIN_DIR"; then
     echo ""
     warn "Restart your shell or run: export PATH=\"\$HOME/.agent-mux/bin:\$PATH\""
@@ -766,8 +767,8 @@ Commands:
   tmux-agent audit stats    Show send/thread/block counters
   uninstall                 Remove agent-mux and restore previous tmux config (if backed up)
   version                   Print version
-  help                      Show tmux-agent and keybinding cheatsheet
-  --help                    Show this CLI reference
+  help, --help              Show this CLI reference
+  cheatsheet, cheat, keys   Show tmux-agent and keybinding quick reference
 
 Files:
   ~/.agent-mux/tmux.conf              tmux configuration (downloaded by default)
@@ -802,7 +803,7 @@ case "${1:-}" in
   attach|open)                     cmd_attach "${@:2}" ;;
   uninstall|remove)                cmd_uninstall ;;
   version|--version|-v|-V)         cmd_version ;;
-  help|cheatsheet|cheat|keys)      cmd_help ;;
-  --help|-h|commands)              cmd_cli_ref ;;
-  *)                               error "Unknown command: $1. Run 'agent-mux help' for cheatsheet, 'agent-mux --help' for all commands." ;;
+  help|--help|-h|commands)         cmd_cli_ref ;;
+  cheatsheet|cheat|keys)           cmd_help ;;
+  *)                               error "Unknown command: $1. Run 'agent-mux help' for commands, or 'agent-mux cheatsheet' for tmux keys and tmux-agent quick reference." ;;
 esac
