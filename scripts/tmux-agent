@@ -3,7 +3,7 @@
 # Any tool that can run bash can use this to talk to other panes.
 set -euo pipefail
 
-VERSION="1.8.0"
+VERSION="1.9.1"
 
 # --- Helpers ---
 
@@ -258,6 +258,15 @@ detect_socket() {
     local socket="${TMUX%%,*}"
     if tmux -S "$socket" list-sessions &>/dev/null; then
       echo "$socket"
+      return
+    fi
+    # Fallback: use $TMUX's built-in connection to ask the server for its own socket
+    # path. Works in sandboxes (e.g. Codex Plan Mode) where explicit -S on the path
+    # fails even though tmux can connect via $TMUX directly.
+    local actual
+    actual=$(tmux display-message -p '#{socket_path}' 2>/dev/null || true)
+    if [[ -n "$actual" ]]; then
+      echo "$actual"
       return
     fi
   fi

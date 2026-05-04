@@ -2,7 +2,7 @@
 # agent-mux — one-command tmux setup
 set -euo pipefail
 
-VERSION="1.8.0"
+VERSION="1.9.1"
 REPO="maxto/agent-mux"
 BRANCH="v${VERSION}"
 BASE_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
@@ -80,6 +80,15 @@ backup_existing() {
   if [[ -f "$TMUX_XDG_DIR/tmux.conf" && ! -L "$TMUX_XDG_DIR/tmux.conf" ]]; then
     cp "$TMUX_XDG_DIR/tmux.conf" "$BACKUP_DIR/tmux.conf.$ts"
     info "Backed up ~/.config/tmux/tmux.conf → ~/.agent-mux/backups/tmux.conf.$ts"
+  fi
+
+  if [[ -L "$TMUX_XDG_DIR/tmux.conf" ]]; then
+    local target
+    target=$(readlink "$TMUX_XDG_DIR/tmux.conf")
+    if [[ "$target" != "$SMUX_DIR/tmux.conf" ]]; then
+      printf '%s\n' "$target" > "$BACKUP_DIR/tmux.conf.symlink.$ts"
+      info "Recorded ~/.config/tmux/tmux.conf symlink target → ~/.agent-mux/backups/tmux.conf.symlink.$ts"
+    fi
   fi
 
   # Check legacy location
@@ -462,7 +471,40 @@ install_skill() {
   download "$source_url/skills/agent-mux/references/tmux.md"          "$claude_dir/references/tmux.md"
 }
 
+install_tmux_config() {
+  local source_url="${1:-$BASE_URL}"
+  warn "Your existing tmux config will be replaced with a symlink to ~/.agent-mux/tmux.conf"
+  warn "Backups are stored in ~/.agent-mux/backups/"
+  mkdir -p "$SMUX_DIR" "$BIN_DIR" "$BACKUP_DIR"
+  backup_existing
+  info "Downloading tmux.conf..."
+  download "$source_url/.tmux.conf" "$SMUX_DIR/tmux.conf"
+  mkdir -p "$TMUX_XDG_DIR"
+  ln -sfn "$SMUX_DIR/tmux.conf" "$TMUX_XDG_DIR/tmux.conf"
+  if tmux list-sessions &>/dev/null; then
+    if tmux source-file "$SMUX_DIR/tmux.conf" 2>/dev/null; then
+      info "Reloaded tmux config."
+    fi
+  fi
+}
+
 cmd_global_install() {
+  local with_config=true
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --with-config|--config=true|--config=on|--config=yes|--config=1)
+        with_config=true
+        ;;
+      --no-config|--without-config|--config=false|--config=off|--config=no|--config=0)
+        with_config=false
+        ;;
+      *)
+        error "Unknown install option: $1. Run 'agent-mux --help'."
+        ;;
+    esac
+    shift
+  done
+
   local os
   os=$(detect_os)
   info "Installing agent-mux ($os)..."
@@ -500,7 +542,12 @@ cmd_global_install() {
   mv "$BIN_DIR/agent-mux.tmp" "$BIN_DIR/agent-mux"
   chmod +x "$BIN_DIR/agent-mux"
 
-  # 6. Ensure PATH
+  # 6. Install tmux config by default
+  if [[ "$with_config" == true ]]; then
+    install_tmux_config "$BASE_URL"
+  fi
+
+  # 7. Ensure PATH
   ensure_path
 
   echo ""
@@ -508,6 +555,12 @@ cmd_global_install() {
   echo ""
   echo "  tmux-agent:     ~/.agent-mux/bin/tmux-agent"
   echo "  agent-mux CLI:  ~/.agent-mux/bin/agent-mux"
+  if [[ "$with_config" == true ]]; then
+    echo "  Config:         ~/.agent-mux/tmux.conf"
+  else
+    echo "  Config:         skipped (--no-config)"
+    warn "Alt controls and red pane borders require the agent-mux tmux config."
+  fi
   echo ""
   echo "  Next: cd your-project && agent-mux install"
   echo "  Then: agent-mux help"
@@ -518,14 +571,26 @@ cmd_global_install() {
 }
 
 cmd_install() {
-  local with_config=false
+  local with_config=true
   local project_dir="$PWD"
   local args=("$@")
   local i=0
   while [[ $i -lt ${#args[@]} ]]; do
     case "${args[$i]}" in
-      --with-config) with_config=true ;;
-      --project-dir) i=$(( i + 1 )); project_dir="${args[$i]}" ;;
+      --with-config|--config=true|--config=on|--config=yes|--config=1)
+        with_config=true
+        ;;
+      --no-config|--without-config|--config=false|--config=off|--config=no|--config=0)
+        with_config=false
+        ;;
+      --project-dir)
+        i=$(( i + 1 ))
+        [[ $i -lt ${#args[@]} ]] || error "--project-dir requires a path"
+        project_dir="${args[$i]}"
+        ;;
+      *)
+        error "Unknown install option: ${args[$i]}. Run 'agent-mux --help'."
+        ;;
     esac
     i=$(( i + 1 ))
   done
@@ -535,21 +600,9 @@ cmd_install() {
   # 1. Install skill (neutral + Claude Code paths)
   install_skill "$project_dir"
 
-  # 2. Download and symlink tmux config (opt-in only)
+  # 2. Download and symlink tmux config by default
   if [[ "$with_config" == true ]]; then
-    warn "Your existing tmux config will be replaced with a symlink to ~/.agent-mux/tmux.conf"
-    warn "Backups are stored in ~/.agent-mux/backups/"
-    mkdir -p "$SMUX_DIR" "$BIN_DIR" "$BACKUP_DIR"
-    backup_existing
-    info "Downloading tmux.conf..."
-    download "$BASE_URL/.tmux.conf" "$SMUX_DIR/tmux.conf"
-    mkdir -p "$TMUX_XDG_DIR"
-    ln -sf "$SMUX_DIR/tmux.conf" "$TMUX_XDG_DIR/tmux.conf"
-    if tmux list-sessions &>/dev/null; then
-      if tmux source-file "$SMUX_DIR/tmux.conf" 2>/dev/null; then
-        info "Reloaded tmux config."
-      fi
-    fi
+    install_tmux_config "$BASE_URL"
   fi
 
   local neutral_rel="${project_dir/#$HOME/\~}/skills/agent-mux"
@@ -563,7 +616,8 @@ cmd_install() {
     echo "  Config:           ~/.agent-mux/tmux.conf"
   else
     echo ""
-    echo "  Tip: run 'agent-mux install --with-config' to also install the tmux config."
+    echo "  Config:           skipped (--no-config)"
+    warn "Alt controls and red pane borders require the agent-mux tmux config."
   fi
   echo ""
   echo "  In Claude Code: /agent-mux"
@@ -592,8 +646,8 @@ cmd_update() {
     install_skill "$PWD" "$MAIN_URL"
   fi
 
-  # Only update tmux config if user previously opted into --with-config
-  # (symlink exists AND points to our file — not a user-managed symlink)
+  # Only update tmux config if the active config is managed by agent-mux
+  # (symlink exists AND points to our file, not a user-managed symlink).
   if [[ -L "$TMUX_XDG_DIR/tmux.conf" ]] && \
      [[ "$(readlink "$TMUX_XDG_DIR/tmux.conf")" == "$SMUX_DIR/tmux.conf" ]]; then
     mkdir -p "$BACKUP_DIR"
@@ -613,20 +667,45 @@ cmd_update() {
 cmd_uninstall() {
   info "Uninstalling agent-mux..."
 
-  # Remove symlink
-  if [[ -L "$TMUX_XDG_DIR/tmux.conf" ]]; then
+  local can_restore_xdg=true
+
+  # Remove only the symlink managed by agent-mux.
+  if [[ -L "$TMUX_XDG_DIR/tmux.conf" ]] && \
+     [[ "$(readlink "$TMUX_XDG_DIR/tmux.conf")" == "$SMUX_DIR/tmux.conf" ]]; then
     rm "$TMUX_XDG_DIR/tmux.conf"
     info "Removed symlink ~/.config/tmux/tmux.conf"
+  elif [[ -e "$TMUX_XDG_DIR/tmux.conf" || -L "$TMUX_XDG_DIR/tmux.conf" ]]; then
+    can_restore_xdg=false
+    info "Keeping existing user-managed ~/.config/tmux/tmux.conf"
   fi
 
-  # Check for backups to restore
-  local latest_backup
+  local latest_symlink latest_xdg latest_legacy
   # shellcheck disable=SC2012  # ls -t is safe here: filenames have no spaces (timestamp format)
-  latest_backup=$(ls -t "$BACKUP_DIR"/tmux.conf.* 2>/dev/null | head -1 || true)
-  if [[ -n "$latest_backup" ]]; then
-    info "Restoring backup: $latest_backup"
-    mkdir -p "$TMUX_XDG_DIR"
-    cp "$latest_backup" "$TMUX_XDG_DIR/tmux.conf"
+  latest_symlink=$(ls -t "$BACKUP_DIR"/tmux.conf.symlink.* 2>/dev/null | head -1 || true)
+  # shellcheck disable=SC2012  # ls -t is safe here: filenames have no spaces (timestamp format)
+  latest_xdg=$(ls -t "$BACKUP_DIR"/tmux.conf.[0-9]* 2>/dev/null | head -1 || true)
+  # shellcheck disable=SC2012  # ls -t is safe here: filenames have no spaces (timestamp format)
+  latest_legacy=$(ls -t "$BACKUP_DIR"/tmux.conf.legacy.* 2>/dev/null | head -1 || true)
+
+  if [[ "$can_restore_xdg" == true ]]; then
+    if [[ -n "$latest_symlink" ]]; then
+      local target
+      target=$(head -n 1 "$latest_symlink")
+      if [[ -n "$target" ]]; then
+        info "Restoring symlink backup: $latest_symlink"
+        mkdir -p "$TMUX_XDG_DIR"
+        ln -s "$target" "$TMUX_XDG_DIR/tmux.conf"
+      fi
+    elif [[ -n "$latest_xdg" ]]; then
+      info "Restoring backup: $latest_xdg"
+      mkdir -p "$TMUX_XDG_DIR"
+      cp "$latest_xdg" "$TMUX_XDG_DIR/tmux.conf"
+    fi
+  fi
+
+  if [[ -n "$latest_legacy" ]]; then
+    info "Restoring legacy backup: $latest_legacy"
+    cp "$latest_legacy" "$HOME/.tmux.conf"
   fi
 
   # Remove agent-mux directory
@@ -660,13 +739,15 @@ agent-mux — one-command tmux setup
 Usage: agent-mux <command> [flags]
 
 Commands:
-  install [--with-config]            Install the agent-mux skill into the current project
+  install [--no-config]              Install the agent-mux skill into the current project
     [--project-dir <path>]             Installs skill into two paths (current dir or --project-dir):
                                          skills/agent-mux/        neutral — any agent
                                          .claude/skills/agent-mux/ Claude Code /agent-mux
-                                       --with-config: also installs the agent-mux tmux config
+                                       Installs the agent-mux tmux config by default
                                        and symlinks it to ~/.config/tmux/tmux.conf.
                                        Your existing config is backed up to ~/.agent-mux/backups/.
+                                       --no-config: keep your tmux config untouched.
+                                       --with-config is accepted for compatibility.
   update                    Update tmux-agent, agent-mux CLI, and tmux.conf to latest
   session start             Create a tmux session layout with labeled panes (no auto-attach)
     [--name <session>]        Default session name: agents
@@ -689,10 +770,10 @@ Commands:
   --help                    Show this CLI reference
 
 Files:
-  ~/.agent-mux/tmux.conf              tmux configuration (downloaded by --with-config)
+  ~/.agent-mux/tmux.conf              tmux configuration (downloaded by default)
   ~/.agent-mux/bin/tmux-agent         cross-pane communication CLI
   ~/.agent-mux/bin/agent-mux          this CLI
-  ~/.agent-mux/backups/               config backups (created by --with-config)
+  ~/.agent-mux/backups/               config backups
   skills/agent-mux/                   skill — neutral path (any agent)
   .claude/skills/agent-mux/           skill — Claude Code /agent-mux slash command
 EOF
@@ -707,12 +788,14 @@ _default_cmd() {
   if [[ -d "$HOME/.agent-mux" && -x "$HOME/.agent-mux/bin/agent-mux" ]]; then
     cmd_cli_ref
   else
-    cmd_global_install
+    cmd_global_install "$@"
   fi
 }
 
 case "${1:-}" in
   "")                              _default_cmd "$@" ;;
+  --with-config|--config=true|--config=on|--config=yes|--config=1|--no-config|--without-config|--config=false|--config=off|--config=no|--config=0)
+                                  _default_cmd "$@" ;;
   install)                         cmd_install "${@:2}" ;;
   update)                          cmd_update ;;
   session)                         cmd_session "${@:2}" ;;

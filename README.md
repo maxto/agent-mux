@@ -4,7 +4,7 @@ agent-mux is tmux for humans and AI agents working in the same terminal.
 
 *A local multi-agent coordination layer for terminal-native AI coding workflows.*
 
-- **Humans get a friendlier tmux**: Alt-key navigation, mouse support, labeled panes, and no prefix-key muscle memory required (requires `agent-mux install --with-config`).
+- **Humans get a friendlier tmux**: Alt-key navigation, mouse support, labeled panes, and no prefix-key muscle memory required.
 - **Agents get a shared control layer**: `tmux-agent` lets Claude Code, Codex, Gemini CLI, aider, local models, and other bash-capable agents read panes, send input, reply across panes, and hand off large payloads without pasting them inline.
 - **Teams get parallel model workflows**: run multiple agents on the same repo for implementation, review, testing, and cross-checking without leaving tmux.
 
@@ -141,9 +141,15 @@ Use your agent's native memory system for persistent project facts. Use `tmux-ag
 curl -fsSL https://maxto.github.io/agent-mux/install.sh | bash
 ```
 
-Installs `tmux-agent` and `agent-mux` into `~/.agent-mux/bin/` and adds them to your PATH. Also installs tmux if missing. Your existing tmux config is **not touched**.
+Installs `tmux-agent` and `agent-mux` into `~/.agent-mux/bin/` and adds them to your PATH. Also installs tmux if missing. By default it installs the agent-mux tmux config, backs up any existing config, and symlinks it at `~/.config/tmux/tmux.conf`.
 
-> The installer modifies your shell rc file (`~/.bashrc` or `~/.zshrc`) to add `~/.agent-mux/bin` to PATH, and may install tmux or xclip via your package manager if they are missing.
+> The installer modifies your shell rc file (`~/.bashrc` or `~/.zshrc`) to add `~/.agent-mux/bin` to PATH, may install tmux or xclip via your package manager if they are missing, and may manage `~/.config/tmux/tmux.conf` unless you pass `--no-config`.
+
+To keep your tmux config untouched during global install:
+
+```bash
+curl -fsSL https://maxto.github.io/agent-mux/install.sh | bash -s -- --no-config
+```
 
 ### Per-project skill (once per project)
 
@@ -152,15 +158,15 @@ cd your-project
 agent-mux install
 ```
 
-Installs the skill into two paths: `skills/agent-mux/` (neutral, any agent) and `.claude/skills/agent-mux/` (Claude Code `/agent-mux` slash command). This teaches any AI agent how to use `tmux-agent` — without it, they don't know the tool exists.
+Installs the skill into two paths: `skills/agent-mux/` (neutral, any agent) and `.claude/skills/agent-mux/` (Claude Code `/agent-mux` slash command), and ensures the tmux config is installed unless you pass `--no-config`. This teaches any AI agent how to use `tmux-agent` — without it, they don't know the tool exists.
 
-### tmux config (optional)
+### tmux config
 
 ```bash
-agent-mux install --with-config
+agent-mux install
 ```
 
-Installs the agent-mux tmux config, backs up your existing one to `~/.agent-mux/backups/` and symlinks it at `~/.config/tmux/tmux.conf`. Adds:
+Installs the agent-mux tmux config by default, backs up your existing one to `~/.agent-mux/backups/`, and symlinks it at `~/.config/tmux/tmux.conf`. Adds:
 
 - **Mouse support** — click to select pane, drag to copy, scroll wheel enters scroll mode
 - **Clipboard integration** — drag-to-copy writes to system clipboard (WSL, macOS, Linux)
@@ -168,21 +174,30 @@ Installs the agent-mux tmux config, backs up your existing one to `~/.agent-mux/
 - **Pane labels** — border shows pane name or current path
 - **10,000 line scrollback**
 
+To keep a personal tmux config untouched, opt out explicitly:
+
+```bash
+agent-mux install --no-config
+# or
+agent-mux install --config=false
+```
+
 ## agent-mux CLI
 
 | Command | Description |
 |---|---|
-| `agent-mux install` | Install the `/agent-mux` skill into `$PWD` (neutral + Claude Code paths) |
-| `agent-mux install --with-config` | Also install the tmux config, symlinked to `~/.config/tmux/tmux.conf` (existing config backed up to `~/.agent-mux/backups/`) |
+| `agent-mux install` | Install the `/agent-mux` skill into `$PWD` and install the tmux config by default |
+| `agent-mux install --no-config` | Install the skill but leave the user's tmux config untouched |
+| `agent-mux install --with-config` | Accepted for compatibility; config install is already the default |
 | `agent-mux install --project-dir <path>` | Install the skill into `<path>` instead of `$PWD` |
-| `agent-mux update` | Re-download tmux-agent and agent-mux CLI; refreshes tmux config only if `--with-config` was previously used; refreshes skill if present in `$PWD` |
+| `agent-mux update` | Re-download tmux-agent and agent-mux CLI; refreshes tmux config only when `~/.config/tmux/tmux.conf` is managed by agent-mux; refreshes skill if present in `$PWD` |
 | `agent-mux session` | Show session help; does not create panes or attach |
 | `agent-mux session start [--name agents] [--labels a,b,c] [--cmds x,y,z]` | Create a tmux session layout with one pane per label; commands are optional; does not attach |
 | `agent-mux session list` | List tmux sessions |
 | `agent-mux session kill --name <session>` | Kill a specific tmux session |
 | `agent-mux attach [session]` | Attach or switch to an existing session; default: `agents` |
 | `agent-mux open [session]` | Alias for `attach`; does not create sessions |
-| `agent-mux uninstall` | Remove `~/.agent-mux/`, restore previous tmux config from backup (if available). Note: does not remove the `PATH` line added to your shell rc file. |
+| `agent-mux uninstall` | Remove `~/.agent-mux/`, restore previous tmux config file or symlink from backup when available. Note: does not remove the `PATH` line added to your shell rc file. |
 | `agent-mux version` | Print version |
 | `agent-mux help` | Show tmux-agent and keybinding cheatsheet |
 
@@ -192,14 +207,14 @@ Installs the agent-mux tmux config, backs up your existing one to `~/.agent-mux/
 |---|---|
 | `~/.agent-mux/bin/tmux-agent` | Cross-pane communication CLI |
 | `~/.agent-mux/bin/agent-mux` | agent-mux CLI |
-| `~/.agent-mux/tmux.conf` | tmux config (downloaded by `--with-config`) |
-| `~/.agent-mux/backups/` | Config backups (created by `--with-config`) |
+| `~/.agent-mux/tmux.conf` | tmux config (downloaded by default) |
+| `~/.agent-mux/backups/` | Config backups and previous symlink targets |
 | `skills/agent-mux/` | Skill — neutral path, readable by any agent |
 | `.claude/skills/agent-mux/` | Skill — Claude Code `/agent-mux` slash command |
 
 ## Controls
 
-> Requires `agent-mux install --with-config`. All shortcuts use **Alt** on Linux/Win-WSL2, **Option** on macOS — no prefix key.
+> Requires the agent-mux tmux config, installed by default. All shortcuts use **Alt** on Linux/Win-WSL2, **Option** on macOS — no prefix key.
 
 
   | Type | Key | Action |
@@ -224,7 +239,7 @@ Installs the agent-mux tmux config, backs up your existing one to `~/.agent-mux/
 
 ### Mouse
 
-> The tmux mouse behavior requires `agent-mux install --with-config`. Click, drag, and scroll work anywhere tmux mouse mode and clipboard integration are supported. Windows Terminal also provides the paste shortcuts below.
+> The tmux mouse behavior requires the agent-mux tmux config, installed by default. Click, drag, and scroll work anywhere tmux mouse mode and clipboard integration are supported. Windows Terminal also provides the paste shortcuts below.
 
 | Action | Result |
 |---|---|

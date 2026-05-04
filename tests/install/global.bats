@@ -38,6 +38,25 @@ teardown() {
   [ -f "$HOME/.agent-mux/help.txt" ]
 }
 
+@test "global install creates tmux.conf symlink by default" {
+  run bash "$INSTALL_SH"
+  [ "$status" -eq 0 ]
+  [ -L "$HOME/.config/tmux/tmux.conf" ]
+}
+
+@test "global install tmux.conf symlink points to agent-mux tmux.conf" {
+  run bash "$INSTALL_SH"
+  [ "$status" -eq 0 ]
+  target=$(readlink "$HOME/.config/tmux/tmux.conf")
+  [ "$target" = "$HOME/.agent-mux/tmux.conf" ]
+}
+
+@test "global install --no-config skips tmux.conf symlink" {
+  run bash "$INSTALL_SH" --no-config
+  [ "$status" -eq 0 ]
+  [ ! -e "$HOME/.config/tmux/tmux.conf" ]
+}
+
 @test "global install adds agent-mux bin to .bashrc" {
   run bash "$INSTALL_SH"
   [ "$status" -eq 0 ]

@@ -24,6 +24,11 @@ This skill is the durable protocol. If the chat is long, re-read this section be
 
 ## Prerequisites
 
+`agent-mux install` installs the agent-mux tmux config by default so pane
+borders, labels, mouse support, and Alt-key controls work. Use
+`agent-mux install --no-config` only when the user explicitly wants to keep a
+personal tmux config untouched.
+
 **Cross-pane send/reply workflows require running inside a tmux pane** (`$TMUX` must be set). Check first:
 
 ```bash
