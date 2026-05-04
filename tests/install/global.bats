@@ -32,10 +32,10 @@ teardown() {
   [ -x "$HOME/.agent-mux/bin/agent-mux" ]
 }
 
-@test "global install places help.txt" {
+@test "global install does not install legacy help.txt" {
   run bash "$INSTALL_SH"
   [ "$status" -eq 0 ]
-  [ -f "$HOME/.agent-mux/help.txt" ]
+  [ ! -e "$HOME/.agent-mux/help.txt" ]
 }
 
 @test "global install creates tmux.conf symlink by default" {
@@ -71,20 +71,17 @@ teardown() {
   [ "$count" -eq 1 ]
 }
 
-@test "help shows CLI reference, not cheatsheet" {
-  run bash "$INSTALL_SH" help
+@test "--help shows combined agent-mux and tmux-agent reference" {
+  run bash "$INSTALL_SH" --help
   [ "$status" -eq 0 ]
   [[ "$output" == *"Usage: agent-mux"* ]]
-  [[ "$output" == *"cheatsheet, cheat, keys"* ]]
+  [[ "$output" == *"tmux-agent — cross-pane communication"* ]]
+  [[ "$output" == *"tmux-agent send <target> <text>"* ]]
   [[ "$output" != *"pane navigation"* ]]
 }
 
-@test "cheatsheet shows tmux-agent and keybinding quick reference" {
-  mkdir -p "$HOME/.agent-mux"
-  cp "$BATS_TEST_DIRNAME/../../help.txt" "$HOME/.agent-mux/help.txt"
-
-  run bash "$INSTALL_SH" cheatsheet
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"tmux-agent quick reference"* ]]
-  [[ "$output" == *"pane navigation"* ]]
+@test "help subcommand points users to --help" {
+  run bash "$INSTALL_SH" help
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Run 'agent-mux --help' for usage."* ]]
 }

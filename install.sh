@@ -2,7 +2,7 @@
 # agent-mux — one-command tmux setup
 set -euo pipefail
 
-VERSION="1.9.2"
+VERSION="1.9.3"
 REPO="maxto/agent-mux"
 BRANCH="v${VERSION}"
 BASE_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
@@ -527,9 +527,8 @@ cmd_global_install() {
     fi
   fi
 
-  # 3. Create directories and download help
+  # 3. Create directories and download binaries
   mkdir -p "$SMUX_DIR" "$BIN_DIR"
-  download "$BASE_URL/help.txt" "$SMUX_DIR/help.txt"
 
   # 4. Download tmux-agent
   info "Downloading tmux-agent..."
@@ -563,8 +562,7 @@ cmd_global_install() {
   fi
   echo ""
   echo "  Next: cd your-project && agent-mux install"
-  echo "  Then: agent-mux help"
-  echo "  Keys: agent-mux cheatsheet"
+  echo "  Then: agent-mux --help"
   if ! echo "$PATH" | tr ':' '\n' | grep -qx "$BIN_DIR"; then
     echo ""
     warn "Restart your shell or run: export PATH=\"\$HOME/.agent-mux/bin:\$PATH\""
@@ -629,7 +627,6 @@ cmd_update() {
   local updated_version="$VERSION"
 
   mkdir -p "$SMUX_DIR" "$BIN_DIR"
-  download "$MAIN_URL/help.txt" "$SMUX_DIR/help.txt"
 
   info "Downloading tmux-agent..."
   download "$MAIN_URL/scripts/tmux-agent" "$BIN_DIR/tmux-agent"
@@ -724,15 +721,6 @@ cmd_version() {
   echo "agent-mux $VERSION"
 }
 
-cmd_help() {
-  local help_file="$SMUX_DIR/help.txt"
-  if [[ -f "$help_file" ]]; then
-    cat "$help_file"
-  else
-    error "Help file not found. Run 'agent-mux update' to install it."
-  fi
-}
-
 cmd_cli_ref() {
   cat <<'EOF'
 agent-mux — one-command tmux setup
@@ -759,16 +747,40 @@ Commands:
   attach [<session>]        Attach to a session by name (default: agents)
     [--name <session>]        Inside tmux: uses switch-client; outside: attach-session
   open [<session>]          Alias for attach; does not create sessions
-  (tmux-agent commands — safety and observability)
-  tmux-agent pause [reason] Pause all cross-pane sends
-  tmux-agent resume         Resume sends after pause
-  tmux-agent status         Show paused/running state
-  tmux-agent audit tail [n] Show last N audit events (default 20)
-  tmux-agent audit stats    Show send/thread/block counters
   uninstall                 Remove agent-mux and restore previous tmux config (if backed up)
   version                   Print version
-  help, --help              Show this CLI reference
-  cheatsheet, cheat, keys   Show tmux-agent and keybinding quick reference
+  --help, -h                Show this CLI reference
+
+tmux-agent — cross-pane communication:
+  tmux-agent list                          Show all panes (id, session:win, size, process, label, cwd)
+  tmux-agent read <target> [lines]         Read last N lines from pane (default: 50)
+  tmux-agent type <target> <text>          Type text into pane without pressing Enter
+  tmux-agent send <target> <text>          Full cycle: read → type message → verify → Enter
+  tmux-agent message <target> <text>       Type text with sender header (no Enter; agent-to-agent)
+  tmux-agent keys <target> <key>...        Send special keys (Enter, Escape, C-c, Tab, etc.)
+  tmux-agent name <target> <label>         Label a pane (shown in tmux border)
+  tmux-agent resolve <label>               Print pane target for a label
+  tmux-agent id                            Print this pane's ID ($TMUX_PANE)
+  tmux-agent doctor                        Diagnose tmux connectivity and socket issues
+
+  tmux-agent send --file <target> <text>   Force file transport (auto when payload >2 KB)
+  tmux-agent send --path <target> <file>   Send bytes from file (preserves newlines, binary)
+  tmux-agent thread list [--limit N]       List recent threads
+  tmux-agent thread read <id>              Read thread messages
+    [--since-cursor] [--head N|--tail N|--bytes N]
+  tmux-agent thread stat <id>              Show thread message count and size
+  tmux-agent thread gc [--ttl <sec>]       Remove old threads (default TTL: 3600 s; --dry-run)
+
+  tmux-agent pause [reason]                Block all cross-pane sends
+  tmux-agent resume                        Unblock sends
+  tmux-agent status                        Show paused/running state
+  tmux-agent audit tail [n]                Show last N audit events (default: 20)
+  tmux-agent audit stats                   Show send/thread/block counters
+
+  Target: %N · session:window.pane · window-index · label set via 'tmux-agent name'
+  Env:    TMUX_AGENT_SOCKET    override tmux server socket (skips auto-detection)
+          TMUX_AGENT_THREAD_DIR override thread storage directory
+          TMUX_AGENT_INLINE_THRESHOLD  max bytes before auto-spill to file (default: 2048)
 
 Files:
   ~/.agent-mux/tmux.conf              tmux configuration (downloaded by default)
@@ -803,7 +815,6 @@ case "${1:-}" in
   attach|open)                     cmd_attach "${@:2}" ;;
   uninstall|remove)                cmd_uninstall ;;
   version|--version|-v|-V)         cmd_version ;;
-  help|--help|-h|commands)         cmd_cli_ref ;;
-  cheatsheet|cheat|keys)           cmd_help ;;
-  *)                               error "Unknown command: $1. Run 'agent-mux help' for commands, or 'agent-mux cheatsheet' for tmux keys and tmux-agent quick reference." ;;
+  --help|-h)                       cmd_cli_ref ;;
+  *)                               error "Unknown command: $1. Run 'agent-mux --help' for usage." ;;
 esac

@@ -1,62 +1,7 @@
-agent-mux cheatsheet
+agent-mux help text moved into the CLI.
 
-tmux-agent quick reference
+Run:
+  agent-mux --help
 
-  list                  show all panes
-  send <t> <msg>        send message to pane
-  read <t> [n]          read N lines from pane
-  type <t> <text>       type text (no Enter)
-  keys <t> <key>...     send special keys
-  name <t> <label>      label a pane
-  resolve <label>       look up pane by label
-  message <t> <text>    type text with sender info (no Enter)
-  id                    print this pane ID
-  version               print version
-  doctor                diagnose connectivity
-  pause [reason]        block all cross-pane sends
-  resume                unblock sends
-  status                show paused/running state
-  audit tail [n]        show last N audit events
-  audit stats           show session send/thread counters
-
-agent-mux
-
-  session               show session help; does not create panes
-  session start         create labeled pane layout without attaching
-  session start --name <s>
-                        use a custom tmux session name
-  session start --labels a,b,c
-                        create one pane per label
-  session start --cmds x,y,z
-                        launch one command per pane
-                        commands cannot contain literal commas
-  attach [s]            attach/switch to an existing session
-  open [s]              alias for attach; does not create sessions
-  session list          list tmux sessions
-  session kill --name s kill a specific session
-
-pane navigation
-
-  Alt+i/k/j/l           up / down / left / right
-  Alt+n                 new pane
-  Alt+w                 close pane
-  Alt+o                 cycle layouts
-  Alt+g / Alt+y         mark / swap
-
-windows
-
-  Alt+m                 new window
-  Alt+u / Alt+h         next / prev window
-
-scroll
-
-  Alt+Tab               toggle scroll mode
-  i / k                 scroll 2 lines
-  I / K                 half page
-  q or Esc              exit scroll mode
-
-clipboard
-
-  drag to select        copy to system clipboard
-  Ctrl+Shift+V          paste (Windows Terminal)
-  Shift+right-click     paste (Windows Terminal)
+For the direct tmux-agent reference:
+  tmux-agent --help

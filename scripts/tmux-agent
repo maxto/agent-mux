@@ -3,7 +3,7 @@
 # Any tool that can run bash can use this to talk to other panes.
 set -euo pipefail
 
-VERSION="1.9.2"
+VERSION="1.9.3"
 
 # --- Helpers ---
 
@@ -1114,7 +1114,7 @@ cmd_audit() {
 
 case "$1" in
   id)        shift; cmd_id "$@"; exit ;;
-  -h|--help|help) usage ;;
+  -h|--help) usage ;;
   version)   echo "tmux-agent $VERSION"; exit ;;
   thread)    shift; init_socket 2>/dev/null || true; cmd_thread "$@"; exit ;;
   threshold) inline_threshold; exit ;;
@@ -1138,5 +1138,5 @@ case "$1" in
   name)    shift; cmd_name "$@" ;;
   resolve) shift; cmd_resolve "$@" ;;
   doctor)  shift; cmd_doctor "$@" ;;
-  *)       die "unknown command: $1. Run 'tmux-agent' for usage." ;;
+  *)       die "unknown command: $1. Run 'tmux-agent --help' for usage." ;;
 esac

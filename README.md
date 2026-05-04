@@ -199,8 +199,7 @@ agent-mux install --config=false
 | `agent-mux open [session]` | Alias for `attach`; does not create sessions |
 | `agent-mux uninstall` | Remove `~/.agent-mux/`, restore previous tmux config file or symlink from backup when available. Note: does not remove the `PATH` line added to your shell rc file. |
 | `agent-mux version` | Print version |
-| `agent-mux help` / `agent-mux --help` | Show the agent-mux CLI reference |
-| `agent-mux cheatsheet` / `agent-mux keys` | Show tmux-agent quick reference and tmux keybindings |
+| `agent-mux --help` | Show the agent-mux CLI reference, including the tmux-agent command summary |
 
 ### Files
 
@@ -216,6 +215,18 @@ agent-mux install --config=false
 ## Controls
 
 > Requires the agent-mux tmux config, installed by default. All shortcuts use **Alt** on Linux/Win-WSL2, **Option** on macOS — no prefix key.
+
+### Status Bar
+
+The status bar keeps tmux context visible without command prompts:
+
+```text
+0:agents  1:logs  2:shell                    s: agmux, p: 3, 17:30:12
+```
+
+- Left: tmux window list, with the current window highlighted
+- Right: current session (`s`), pane count in the active window (`p`), and live time
+- The pane count updates when you switch windows; the clock updates every second
 
 
   | Type | Key | Action |

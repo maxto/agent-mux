@@ -29,6 +29,10 @@ borders, labels, mouse support, and Alt-key controls work. Use
 `agent-mux install --no-config` only when the user explicitly wants to keep a
 personal tmux config untouched.
 
+Use `agent-mux --help` for the combined agent-mux and tmux-agent command
+reference. Use `tmux-agent --help` when you only need the direct tmux-agent CLI
+reference.
+
 **Cross-pane send/reply workflows require running inside a tmux pane** (`$TMUX` must be set). Check first:
 
 ```bash
@@ -64,6 +68,19 @@ agent-mux session start --name local --labels qwen,deepseek,kimi --cmds qwen,dee
 agent-mux session list
 agent-mux session kill --name local
 ```
+
+## Visible tmux UI
+
+The default status bar shows the window list on the left and current context on
+the right:
+
+```text
+0:agents  1:logs                         s: agmux, p: 3, 17:30:12
+```
+
+`s` is the active session, `p` is the pane count in the active window, and the
+time updates every second. The pane count changes when the user switches
+windows.
 
 ## Adding Panes (New Terminals)
 
