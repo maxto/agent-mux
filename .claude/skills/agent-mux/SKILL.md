@@ -82,6 +82,10 @@ the right:
 time updates every second. The pane count changes when the user switches
 windows.
 
+Use `agent-mux window rename <name>` for user-requested window renames. Use
+`agent-mux window rename <name> --target <session:window>` when outside tmux.
+Raw `tmux rename-window` is a low-level fallback only.
+
 ## Adding Panes (New Terminals)
 
 When the user asks you to "open a new terminal", "add a pane", or "open two terminals", do it **within the current agent-mux session** — not with raw tmux windows or separate sessions.

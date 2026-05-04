@@ -2,7 +2,7 @@
 # agent-mux — one-command tmux setup
 set -euo pipefail
 
-VERSION="1.9.3"
+VERSION="1.9.4"
 REPO="maxto/agent-mux"
 BRANCH="v${VERSION}"
 BASE_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
@@ -166,6 +166,24 @@ Behavior:
   --cmds is comma-separated; commands containing literal commas are not supported.
   Outside tmux: creates and labels the session (without attaching). Use 'agent-mux attach' to enter it.
   Inside tmux: run from the pane you want as the first label; missing panes are created as splits.
+EOF
+}
+
+window_usage() {
+  cat <<'EOF'
+agent-mux window — manage tmux windows at the agent-mux level
+
+Usage:
+  agent-mux window rename <name> [--target <window>]
+
+Examples:
+  agent-mux window rename work
+  agent-mux window rename logs --target agents:0
+
+Behavior:
+  Inside tmux, rename targets the current window by default.
+  Outside tmux, pass --target <session:window>.
+  Use raw tmux commands only for low-level operations not covered here.
 EOF
 }
 
@@ -441,6 +459,63 @@ cmd_session() {
     list)  [[ $# -eq 0 ]] || error "session list does not accept arguments"; cmd_session_list ;;
     kill|close|rm|remove) cmd_session_kill "$@" ;;
     *) error "Unknown session subcommand: $subcmd. Run 'agent-mux session --help'." ;;
+  esac
+}
+
+cmd_window_rename() {
+  require_tmux_binary
+  local name="" target=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --target|-t)
+        shift
+        [[ $# -gt 0 ]] || error "--target requires a window target"
+        target="$1"
+        ;;
+      --help|-h)
+        window_usage
+        return
+        ;;
+      -*)
+        error "Unknown window rename option: $1. Run 'agent-mux window --help'."
+        ;;
+      *)
+        [[ -z "$name" ]] || error "window rename accepts only one window name"
+        name="$1"
+        ;;
+    esac
+    shift
+  done
+
+  [[ -n "$name" ]] || error "window rename requires <name>"
+  [[ "$name" != *$'\n'* ]] || error "window name cannot contain newlines"
+
+  if [[ -n "$target" ]]; then
+    tmux_cmd rename-window -t "$target" "$name"
+  else
+    current_tmux_pane >/dev/null 2>&1 || error "window rename requires --target when outside tmux"
+    tmux_cmd rename-window "$name"
+  fi
+  info "Renamed window to '$name'."
+}
+
+cmd_window() {
+  if [[ "${1:-}" == "help" || "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    window_usage
+    return
+  fi
+
+  if [[ $# -eq 0 ]]; then
+    window_usage
+    return
+  fi
+
+  local subcmd="$1"
+  shift
+  case "$subcmd" in
+    rename|name) cmd_window_rename "$@" ;;
+    *) error "Unknown window subcommand: $subcmd. Run 'agent-mux window --help'." ;;
   esac
 }
 
@@ -744,6 +819,8 @@ Commands:
     [--cmds x,y,z]            Optional command per pane; count must match labels
   session list              List tmux sessions
   session kill --name <s>   Kill a specific tmux session
+  window rename <name>      Rename the current tmux window
+    [--target <window>]       Required when outside tmux; example: agents:0
   attach [<session>]        Attach to a session by name (default: agents)
     [--name <session>]        Inside tmux: uses switch-client; outside: attach-session
   open [<session>]          Alias for attach; does not create sessions
@@ -812,6 +889,7 @@ case "${1:-}" in
   install)                         cmd_install "${@:2}" ;;
   update)                          cmd_update ;;
   session)                         cmd_session "${@:2}" ;;
+  window)                          cmd_window "${@:2}" ;;
   attach|open)                     cmd_attach "${@:2}" ;;
   uninstall|remove)                cmd_uninstall ;;
   version|--version|-v|-V)         cmd_version ;;

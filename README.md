@@ -195,6 +195,7 @@ agent-mux install --config=false
 | `agent-mux session start [--name agents] [--labels a,b,c] [--cmds x,y,z]` | Create a tmux session layout with one pane per label; commands are optional; does not attach |
 | `agent-mux session list` | List tmux sessions |
 | `agent-mux session kill --name <session>` | Kill a specific tmux session |
+| `agent-mux window rename <name> [--target <window>]` | Rename the current tmux window; pass `--target` when outside tmux |
 | `agent-mux attach [session]` | Attach or switch to an existing session; default: `agents` |
 | `agent-mux open [session]` | Alias for `attach`; does not create sessions |
 | `agent-mux uninstall` | Remove `~/.agent-mux/`, restore previous tmux config file or symlink from backup when available. Note: does not remove the `PATH` line added to your shell rc file. |
@@ -427,6 +428,18 @@ tmux-agent type worker "y"
 tmux-agent read worker        # verify "y" appeared
 tmux-agent keys worker Enter
 ```
+
+## Window Names
+
+Use `agent-mux window rename` for normal window naming instead of raw tmux:
+
+```bash
+agent-mux window rename work
+agent-mux window rename logs --target agents:0
+```
+
+The left side of the status bar shows tmux windows as `<index>:<name>`, so
+renaming the current window changes `0:agents` to something like `0:work`.
 
 ### Environment
 

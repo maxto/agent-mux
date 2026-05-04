@@ -127,6 +127,31 @@ teardown() {
   [[ "$output" == *"session kill requires"* ]]
 }
 
+@test "window rename renames current window inside tmux" {
+  export TMUX=/tmp/tmux-test/default,123,0
+  export TMUX_PANE=%1
+
+  run bash "$INSTALL_SH" window rename work
+
+  [ "$status" -eq 0 ]
+  grep -q "rename-window work" "$TMUX_FIXTURE_LOG"
+  [[ "$output" == *"Renamed window to 'work'."* ]]
+}
+
+@test "window rename supports explicit target outside tmux" {
+  run bash "$INSTALL_SH" window rename logs --target agents:0
+
+  [ "$status" -eq 0 ]
+  grep -q "rename-window -t agents:0 logs" "$TMUX_FIXTURE_LOG"
+}
+
+@test "window rename requires target outside tmux" {
+  run bash "$INSTALL_SH" window rename work
+
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"window rename requires --target when outside tmux"* ]]
+}
+
 @test "attach accepts positional session name" {
   export TMUX_FIXTURE_HAS_SESSION=0
   run bash "$INSTALL_SH" attach custom
