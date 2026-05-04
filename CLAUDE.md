@@ -18,11 +18,11 @@ Project memory lives in `.claude/memory/` (gitignored). Read `MEMORY.md` there f
 ## Installation & Update
 
 ```bash
-# Install from hosted URL (safe — does not touch existing tmux config)
+# Install from hosted URL
 curl -fsSL https://maxto.github.io/agent-mux/install.sh | bash
 
-# Also install the agent-mux tmux config (symlinks ~/.config/tmux/tmux.conf, backs up existing)
-agent-mux install --with-config
+# Keep a personal tmux config untouched
+agent-mux install --no-config
 
 # After cloning locally, run install directly
 bash install.sh
@@ -34,22 +34,43 @@ agent-mux update
 agent-mux uninstall
 ```
 
-No build step. No package manager. Pure bash — `install.sh` downloads binaries to `~/.agent-mux/`. The default install does **not** touch the user's tmux config; `--with-config` opts in to symlink management.
+No build step. No package manager. Pure bash — `install.sh` downloads binaries to `~/.agent-mux/`. The default install manages the agent-mux tmux config and backs up existing config; `--no-config` opts out.
+
+For normal user workflows, prefer `agent-mux` commands over raw `tmux` when a
+high-level command exists. For example, use `agent-mux window rename <name>` to
+rename the current window, or `agent-mux window rename <name> --target
+<session:window>` when outside tmux. Raw `tmux rename-window` is only a
+low-level fallback.
 
 ## Testing
 
-No automated test suite. Manual verification:
+Run automated checks before committing:
 
 ```bash
-# Check tmux-agent connectivity
-tmux-agent doctor
+bash -n install.sh scripts/tmux-agent
+shellcheck install.sh scripts/tmux-agent
+bats tests/install/
+bats tests/tmux-agent/
+```
 
-# Exercise core commands
+Manual smoke checks when needed:
+
+```bash
+tmux-agent doctor
 tmux-agent list
 tmux-agent read <pane-target>
 tmux-agent type <pane-target> "text"
 tmux-agent keys <pane-target> Enter
 ```
+
+## Release Rule
+
+Read the current version from `VERSION` in `install.sh` and `scripts/tmux-agent`.
+Whenever those versions change, create and push the exact matching tag after
+pushing `main`, for example `v1.9.4`. This applies to patch, minor, and major
+releases. `install.sh` downloads release files from `v${VERSION}`, so a missing
+tag breaks fresh installs. Docs-only or test-only commits without a version bump
+do not need a tag.
 
 ## Architecture
 
@@ -80,7 +101,7 @@ Handles macOS `/tmp` → `/private/tmp` symlink transparently.
 
 ### install.sh flow
 
-Detects OS/package manager → installs tmux if missing → downloads `tmux-agent` and `agent-mux` CLI → adds `~/.agent-mux/bin` to shell rc. With `--with-config`: additionally backs up existing config to `~/.agent-mux/backups/`, downloads `.tmux.conf`, symlinks it to `~/.config/tmux/tmux.conf`, and reloads tmux if running.
+Detects OS/package manager → installs tmux if missing → downloads `tmux-agent` and `agent-mux` CLI → manages the agent-mux tmux config by default → adds `~/.agent-mux/bin` to shell rc. Config install backs up existing config to `~/.agent-mux/backups/`, downloads `.tmux.conf`, symlinks it to `~/.config/tmux/tmux.conf`, and reloads tmux if running. `--no-config` skips tmux config management.
 
 ## Editing Guidelines
 

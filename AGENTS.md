@@ -32,8 +32,10 @@ History uses Conventional Commit-style prefixes such as `feat:`, `fix:`, `docs:`
 
 ## Versioning Guidelines
 
-Current version is `1.8.0`. Use conservative semantic versioning: bump `PATCH` (`0.0.1`) by default for fixes, docs, tests, hardening, and small tweaks; bump `MINOR` (`0.1.0`) only for new public commands or compatible capabilities with tests and updated docs; bump `MAJOR` (`1.0.0`) only for breaking CLI, protocol, storage, or install changes. Because the project is already in the `1.x` line, the next breaking release would be `2.0.0`. Update both `install.sh` and `scripts/tmux-agent` when changing the version.
+Read the current version from `VERSION` in `install.sh` and `scripts/tmux-agent`. Use conservative semantic versioning: bump `PATCH` (`0.0.1`) by default for fixes, docs, tests, hardening, and small tweaks; bump `MINOR` (`0.1.0`) only for new public commands or compatible capabilities with tests and updated docs; bump `MAJOR` (`1.0.0`) only for breaking CLI, protocol, storage, or install changes. Because the project is already in the `1.x` line, the next breaking release would be `2.0.0`. Update both `install.sh` and `scripts/tmux-agent` when changing the version.
+
+Every version bump is a release and must get a matching Git tag pushed to origin, not only major releases. `install.sh` sets `BRANCH="v${VERSION}"` and downloads files from the version tag, so missing tags break fresh installs. After pushing `main`, create and push the exact tag, for example `v1.9.4`. Docs-only or test-only commits without a version bump do not need a tag.
 
 ## Agent-Specific Instructions
 
-Do not weaken `tmux-agent` read-before-act behavior: agents must read a pane before typing or sending keys. Keep installer changes conservative because `install.sh` modifies user shell rc files and may manage `~/.config/tmux/tmux.conf` only when `--with-config` is requested.
+Do not weaken `tmux-agent` read-before-act behavior: agents must read a pane before typing or sending keys. Keep installer changes conservative because `install.sh` modifies user shell rc files and manages `~/.config/tmux/tmux.conf` by default unless the user passes `--no-config`.
