@@ -41,6 +41,11 @@ teardown() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"thread: "* ]]
 
+  pane_text=$(tmux -S "$SOCKET" capture-pane -t "$TARGET_PANE" -p -J)
+  [[ "$pane_text" == *"kind=thread"* ]]
+  [[ "$pane_text" == *"To reply: tmux-agent send $SENDER_PANE 'your response'"* ]]
+  [[ "$pane_text" == *"Protocol: tmux-agent protocol"* ]]
+
   thread_id=$(printf '%s' "$output" | sed -n 's/^thread: //p')
   thread_file="$XDG_RUNTIME_DIR/threads/$thread_id/messages/000001.md"
   [ -f "$thread_file" ]

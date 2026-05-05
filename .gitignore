@@ -10,3 +10,8 @@ scripts/claude-pane-alert.sh
 
 # Local AI memory (not for version control)
 .claude/memory/
+
+# Local AI skills/tools (not part of agent-mux)
+.agents/
+.claude/skills/premortem
+skills-lock.json

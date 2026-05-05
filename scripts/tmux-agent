@@ -3,7 +3,7 @@
 # Any tool that can run bash can use this to talk to other panes.
 set -euo pipefail
 
-VERSION="1.10.0"
+VERSION="1.10.1"
 
 # --- Helpers ---
 
@@ -599,8 +599,20 @@ cmd_task() {
   local text="$*"
   local footer
   footer=$(printf '\n\n---\n[agent-mux] To reply: tmux-agent send %s '"'"'your response'"'"'\n[agent-mux] Protocol: tmux-agent protocol' "$reply_pane")
+  local full_text="${text}${footer}"
+  local threshold byte_len
+  threshold=$(inline_threshold)
+  byte_len=$(printf '%s' "$full_text" | wc -c)
 
-  cmd_send "$target" "${text}${footer}"
+  if (( threshold == 0 || byte_len > threshold )); then
+    local resolved
+    resolved=$(resolve_target "$target")
+    validate_target "$resolved"
+    _send_thread "$resolved" text "$full_text" "$footer"
+    return
+  fi
+
+  cmd_send "$target" "$full_text"
 }
 
 cmd_send_file() {
@@ -617,6 +629,7 @@ cmd_send_file() {
 # kind=file → src is a path; bytes are streamed via cat (preserves trailing newlines).
 _send_thread() {
   local target="$1" kind="$2" src="$3"
+  local visible_suffix="${4:-}"
 
   local sender_pane="${TMUX_PANE:-}"
   [[ -z "$sender_pane" ]] && die "not running inside a tmux pane (\$TMUX_PANE is unset)"
@@ -654,7 +667,7 @@ _send_thread() {
   fi
   _audit_event thread_create "$from_label" "$target" "$payload_bytes" thread "$thread_id"
 
-  local ping="[tmux-agent v1 kind=thread thread=${thread_id} seq=${seq} from=${from_label} pane=${sender_pane} at=${session_win} reply=${sender_pane}]"
+  local ping="[tmux-agent v1 kind=thread thread=${thread_id} seq=${seq} from=${from_label} pane=${sender_pane} at=${session_win} reply=${sender_pane}]${visible_suffix}"
   cmd_read "$target" 10 >/dev/null
   tmx send-keys -t "$target" -l -- "$ping"
   clear_read "$target"
