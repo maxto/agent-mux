@@ -2,7 +2,7 @@
 # agent-mux — one-command tmux setup
 set -euo pipefail
 
-VERSION="1.10.1"
+VERSION="1.10.2"
 REPO="maxto/agent-mux"
 BRANCH="v${VERSION}"
 BASE_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
@@ -298,7 +298,7 @@ cmd_session_start_outside() {
 
   local pane last_pane i
   SESSION_PANES=()
-  pane=$(tmux_cmd new-session -d -s "$session_name" -n agents -PF '#{pane_id}')
+  pane=$(tmux_cmd new-session -d -s "$session_name" -n "$session_name" -PF '#{pane_id}')
   SESSION_PANES+=("$pane")
   last_pane="$pane"
 

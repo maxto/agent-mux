@@ -44,7 +44,7 @@ teardown() {
 @test "session start outside tmux creates named session without attaching" {
   run bash "$INSTALL_SH" session start --name custom
   [ "$status" -eq 0 ]
-  grep -q "new-session -d -s custom -n agents" "$TMUX_FIXTURE_LOG"
+  grep -q "new-session -d -s custom -n custom" "$TMUX_FIXTURE_LOG"
   ! grep -q "attach-session -t custom" "$TMUX_FIXTURE_LOG"
   [[ "$output" == *"Run: agent-mux attach custom"* ]]
 }
