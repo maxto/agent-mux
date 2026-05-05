@@ -42,6 +42,30 @@ teardown() {
   [[ "$output" == *"myagent"* ]]
 }
 
+@test "list --current shows only panes in caller session" {
+  OTHER_PANE=$(tmux -S "$SOCKET" new-session -d -s other -PF '#{pane_id}')
+  bash "$TMUX_AGENT" name "$TEST_PANE" localpane
+  bash "$TMUX_AGENT" name "$OTHER_PANE" otherpane
+
+  run bash "$TMUX_AGENT" list --current
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"localpane"* ]]
+  [[ "$output" != *"otherpane"* ]]
+  [[ "$output" != *"other:0"* ]]
+}
+
+@test "list --session shows only panes in named session" {
+  OTHER_PANE=$(tmux -S "$SOCKET" new-session -d -s other -PF '#{pane_id}')
+  bash "$TMUX_AGENT" name "$TEST_PANE" localpane
+  bash "$TMUX_AGENT" name "$OTHER_PANE" otherpane
+
+  run bash "$TMUX_AGENT" list --session other
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"otherpane"* ]]
+  [[ "$output" == *"other:0"* ]]
+  [[ "$output" != *"localpane"* ]]
+}
+
 @test "resolve fails for unknown label" {
   run bash "$TMUX_AGENT" resolve nonexistentlabel
   [ "$status" -ne 0 ]

@@ -232,6 +232,7 @@ The status bar keeps tmux context visible without command prompts:
 - Left: tmux window list, with the current window highlighted
 - Right: current session (`s`), pane count in the active window (`p`), and live time
 - The pane count updates when you switch windows; the clock updates every second
+- Pane borders show `label: %target`, for example `codex: %0`
 
 
   | Type | Key | Action |
@@ -280,6 +281,8 @@ A CLI to send text to any tmux pane — without copy-paste. Works from your shel
 | Command | Description |
 |---|---|
 | `tmux-agent list` | Show all panes (ID, process, label) |
+| `tmux-agent list --current` | Show only panes in the caller's current tmux session |
+| `tmux-agent list --session <name>` | Show only panes in a named tmux session |
 | `tmux-agent protocol` | Show the minimal reply protocol; works outside tmux |
 | `tmux-agent name <target> <label>` | Give a pane a readable name |
 | `tmux-agent read <target> [lines]` | Read last N lines from a pane (default: 50) |

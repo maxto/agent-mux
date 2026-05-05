@@ -3,7 +3,7 @@
 # Any tool that can run bash can use this to talk to other panes.
 set -euo pipefail
 
-VERSION="1.10.2"
+VERSION="1.10.3"
 
 # --- Helpers ---
 
@@ -340,7 +340,8 @@ tmux-agent — cross-pane communication for AI agents
 Usage: tmux-agent <command> [args...]
 
 Commands:
-  list                      Show all panes (target, pid, command, size, label)
+  list [--current]          Show panes; default: all sessions
+    [--session <name>]      Show panes from one session
   protocol                  Show the minimal agent reply protocol (no tmux required)
   type <target> <text>      Type text without pressing Enter
   send <target> <text>      Read, send message, verify, and press Enter (full cycle)
@@ -478,8 +479,34 @@ require_args() {
 
 cmd_list() {
   require_tmux
+  local session_filter="" list_target=("-a")
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --all|-a)
+        session_filter=""
+        list_target=("-a")
+        ;;
+      --current|-c)
+        [[ -n "${TMUX_PANE:-}" ]] || die "list --current requires running inside a tmux pane"
+        session_filter=$(tmx display-message -t "$TMUX_PANE" -p '#{session_name}' 2>/dev/null || true)
+        [[ -n "$session_filter" ]] || die "could not detect current tmux session"
+        list_target=("-t" "$session_filter")
+        ;;
+      --session)
+        shift
+        [[ $# -gt 0 ]] || die "list --session requires a session name"
+        session_filter="$1"
+        list_target=("-t" "$session_filter")
+        ;;
+      *)
+        die "unknown list option: $1. Use: list [--all|--current|--session <name>]"
+        ;;
+    esac
+    shift
+  done
+
   printf "%-8s %-16s %-10s %-25s %-10s %s\n" "TARGET" "SESSION:WIN" "SIZE" "PROCESS" "LABEL" "CWD"
-  tmx list-panes -a \
+  tmx list-panes "${list_target[@]}" \
     -F '#{pane_id}|#{session_name}|#{window_index}|#{window_name}|#{pane_pid}|#{pane_width}x#{pane_height}|#{@name}|#{pane_current_path}' \
     2>/dev/null | while IFS='|' read -r id sess widx _ pid size label cwd; do
       # Get the actual running process (deepest child of pane pid)

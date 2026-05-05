@@ -59,6 +59,8 @@ error: must read the pane before interacting. Run: tmux-agent read codex
 |---|---|---|
 | `tmux-agent protocol` | Show minimal reply protocol; works outside tmux | `tmux-agent protocol` |
 | `tmux-agent list` | Show all panes with target, pid, command, size, label | `tmux-agent list` |
+| `tmux-agent list --current` | Show only panes in the caller's current session | `tmux-agent list --current` |
+| `tmux-agent list --session <name>` | Show only panes in a named session | `tmux-agent list --session crm` |
 | `tmux-agent type <target> <text>` | Type text without pressing Enter | `tmux-agent type codex "hello"` |
 | `tmux-agent send <target> <text>` | Read, send message, verify, and press Enter (full cycle) | `tmux-agent send codex "review src/auth.ts"` |
 | `tmux-agent task <target> <text>` | Like `send`, but appends reply/protocol instructions | `tmux-agent task codex "review src/auth.ts"` |

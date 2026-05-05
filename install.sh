@@ -2,7 +2,7 @@
 # agent-mux — one-command tmux setup
 set -euo pipefail
 
-VERSION="1.10.2"
+VERSION="1.10.3"
 REPO="maxto/agent-mux"
 BRANCH="v${VERSION}"
 BASE_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
@@ -833,7 +833,8 @@ Commands:
   --help, -h                Show this CLI reference
 
 tmux-agent — cross-pane communication:
-  tmux-agent list                          Show all panes (id, session:win, size, process, label, cwd)
+  tmux-agent list [--current]              Show panes (default: all sessions)
+    [--session <name>]                       Filter panes to one session
   tmux-agent protocol                      Show minimal reply protocol (no tmux required)
   tmux-agent read <target> [lines]         Read last N lines from pane (default: 50)
   tmux-agent type <target> <text>          Type text into pane without pressing Enter
