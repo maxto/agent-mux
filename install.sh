@@ -2,7 +2,7 @@
 # agent-mux — one-command tmux setup
 set -euo pipefail
 
-VERSION="1.9.5"
+VERSION="1.10.0"
 REPO="maxto/agent-mux"
 BRANCH="v${VERSION}"
 BASE_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
@@ -534,6 +534,8 @@ install_skill() {
   info "Installing agent-mux skill to ${neutral_dir/#$HOME/\~}..."
   mkdir -p "$neutral_dir/references"
   download "$source_url/skills/agent-mux/SKILL.md"                    "$neutral_dir/SKILL.md"
+  download "$source_url/skills/agent-mux/references/protocol.md"      "$neutral_dir/references/protocol.md"
+  download "$source_url/skills/agent-mux/references/orchestration.md" "$neutral_dir/references/orchestration.md"
   download "$source_url/skills/agent-mux/references/tmux-agent.md"   "$neutral_dir/references/tmux-agent.md"
   download "$source_url/skills/agent-mux/references/tmux.md"          "$neutral_dir/references/tmux.md"
 
@@ -542,6 +544,8 @@ install_skill() {
   info "Installing Claude Code skill to ${claude_dir/#$HOME/\~}..."
   mkdir -p "$claude_dir/references"
   download "$source_url/skills/agent-mux/SKILL.md"                    "$claude_dir/SKILL.md"
+  download "$source_url/skills/agent-mux/references/protocol.md"      "$claude_dir/references/protocol.md"
+  download "$source_url/skills/agent-mux/references/orchestration.md" "$claude_dir/references/orchestration.md"
   download "$source_url/skills/agent-mux/references/tmux-agent.md"   "$claude_dir/references/tmux-agent.md"
   download "$source_url/skills/agent-mux/references/tmux.md"          "$claude_dir/references/tmux.md"
 }
@@ -830,9 +834,11 @@ Commands:
 
 tmux-agent — cross-pane communication:
   tmux-agent list                          Show all panes (id, session:win, size, process, label, cwd)
+  tmux-agent protocol                      Show minimal reply protocol (no tmux required)
   tmux-agent read <target> [lines]         Read last N lines from pane (default: 50)
   tmux-agent type <target> <text>          Type text into pane without pressing Enter
   tmux-agent send <target> <text>          Full cycle: read → type message → verify → Enter
+  tmux-agent task <target> <text>          Send task with reply/protocol instructions
   tmux-agent message <target> <text>       Type text with sender header (no Enter; agent-to-agent)
   tmux-agent keys <target> <key>...        Send special keys (Enter, Escape, C-c, Tab, etc.)
   tmux-agent name <target> <label>         Label a pane (shown in tmux border)

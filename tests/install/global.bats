@@ -77,6 +77,8 @@ teardown() {
   [[ "$output" == *"Usage: agent-mux"* ]]
   [[ "$output" == *"tmux-agent — cross-pane communication"* ]]
   [[ "$output" == *"tmux-agent send <target> <text>"* ]]
+  [[ "$output" == *"tmux-agent protocol"* ]]
+  [[ "$output" == *"tmux-agent task <target> <text>"* ]]
   [[ "$output" != *"pane navigation"* ]]
 }
 

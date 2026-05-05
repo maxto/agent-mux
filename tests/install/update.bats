@@ -26,7 +26,7 @@ old_installer() {
 @test "update reports version from downloaded CLI" {
   installer="$(old_installer)"
 
-  run bash "$installer" update
+  run bash -c 'cd "$1" && bash "$2" update' _ "$PROJECT_DIR" "$installer"
 
   [ "$status" -eq 0 ]
   [[ "$output" == *"agent-mux updated to v1.4.0!"* ]]

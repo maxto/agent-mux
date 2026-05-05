@@ -8,6 +8,10 @@ agent-mux is tmux for humans and AI agents working in the same terminal.
 - **Agents get a shared control layer**: `tmux-agent` lets Claude Code, Codex, Gemini CLI, aider, local models, and other bash-capable agents read panes, send input, reply across panes, and hand off large payloads without pasting them inline.
 - **Teams get parallel model workflows**: run multiple agents on the same repo for implementation, review, testing, and cross-checking without leaving tmux.
 
+agent-mux is not a memory system, RAG layer, or codebase knowledge graph. It
+installs the tmux workspace, `tmux-agent` protocol, and neutral skill docs; use
+your agents' own memory systems for durable project facts.
+
 ## Why agent-mux?
 
 Without it:
@@ -92,8 +96,8 @@ Ask two agents to inspect the same change from different angles, then reconcile
 their replies in the coordinator pane:
 
 ```bash
-tmux-agent send codex "Review this branch for regressions. Focus on tests and edge cases."
-tmux-agent send gemini "Review this branch independently. Focus on design and simplification."
+tmux-agent task codex "Review this branch for regressions. Focus on tests and edge cases."
+tmux-agent task gemini "Review this branch independently. Focus on design and simplification."
 ```
 
 ### Large Handoffs
@@ -127,7 +131,7 @@ Any agent can fill any role. Claude Code, Codex, Gemini, Qwen, DeepSeek, aider, 
 agent-mux does not provide long-term memory or automatic RAG. The durable state is the installed skill plus explicit files in your project. When chats get long or an agent starts skipping coordination steps, reload the skill and follow its coordination contract:
 
 - reply to `[tmux-agent v1 ... reply=<pane>]` messages with `tmux-agent send <pane> ...`
-- use `tmux-agent send` for normal agent handoffs because it types, verifies, and presses Enter
+- use `tmux-agent task` for skill-unaware agents and `tmux-agent send` for normal handoffs
 - include worker ownership, review, testing, and follow-up in multi-agent plans
 - summarize delegated work before finalizing
 
@@ -276,9 +280,11 @@ A CLI to send text to any tmux pane — without copy-paste. Works from your shel
 | Command | Description |
 |---|---|
 | `tmux-agent list` | Show all panes (ID, process, label) |
+| `tmux-agent protocol` | Show the minimal reply protocol; works outside tmux |
 | `tmux-agent name <target> <label>` | Give a pane a readable name |
 | `tmux-agent read <target> [lines]` | Read last N lines from a pane (default: 50) |
 | `tmux-agent send <target> <text>` | Send a message — full cycle: read → type → verify → Enter |
+| `tmux-agent task <target> <text>` | Send a task with reply/protocol instructions for skill-unaware agents |
 | `tmux-agent send --file <target> <text>` | File-based transport; auto-selected if payload >2KB |
 | `tmux-agent send --path <target> <file>` | Read file and send via file transport (avoids shell ARG_MAX) |
 | `tmux-agent type <target> <text>` | Type text into a pane without pressing Enter |
@@ -316,6 +322,15 @@ Name a pane once, use the label everywhere:
 tmux-agent name %1 codex
 tmux-agent send codex "hello"
 ```
+
+For a receiver that may not know agent-mux yet, use `task`:
+
+```bash
+tmux-agent task codex "Review the installer changes. Reply with risks and tests."
+```
+
+The task footer tells the receiver how to reply and how to print the compact
+protocol with `tmux-agent protocol`.
 
 ### The read guard
 
@@ -465,16 +480,36 @@ need tmux behavior outside the agent-mux workflow.
 
 See the [agent-mux skill](skills/agent-mux/SKILL.md) for full documentation on agent-to-agent workflows.
 
+### Role Frameworks
+
+agent-mux does not hardcode roles. A coordinator can assign them per task:
+
+```text
+Planner / Architect
+├── Front-end Agent
+├── Back-end Agent
+├── Data / DB Agent
+├── DevOps Agent
+├── QA Agent
+├── Security Agent
+└── Adversarial Agent
+```
+
+Specialist agents should get explicit ownership, forbidden files, expected
+output, and test/review duties. QA, Security, and Adversarial agents are
+read-only by default. See
+[`references/orchestration.md`](skills/agent-mux/references/orchestration.md).
+
 ## AI Agent Skills
 
-A **skill** is a markdown file loaded into an agent's context that explains how to use a tool — in this case, how to use `tmux-agent` to read panes, send messages, and coordinate with other agents.
+A **skill** is a markdown file loaded into an agent's context that explains how to use a tool — in this case, how to use `tmux-agent` to read panes, send messages, and coordinate with other agents. The top-level skill is intentionally short and points agents to specific references only when needed.
 
 `agent-mux install` copies the skill to two paths:
 
 - **`skills/agent-mux/`** — neutral path, readable by any agent
 - **`.claude/skills/agent-mux/`** — Claude Code `/agent-mux` slash command
 
-In **Claude Code**, load the skill with `/agent-mux`. For other agents, point them at `skills/agent-mux/SKILL.md` — any agent that can read a file or accept a system prompt can use it.
+In **Claude Code**, load the skill with `/agent-mux`. For other agents, point them at `skills/agent-mux/SKILL.md` — any agent that can read a file or accept a system prompt can use it. agent-mux does not install Claude, Codex, Qwen, DeepSeek, Gemma, Kimi, Gemini, or any model-specific CLI.
 
 For other agents, point them at `skills/agent-mux/SKILL.md` — paste it into the system prompt or use your agent's file-loading command.
 

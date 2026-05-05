@@ -57,9 +57,11 @@ error: must read the pane before interacting. Run: tmux-agent read codex
 
 | Command | Description | Example |
 |---|---|---|
+| `tmux-agent protocol` | Show minimal reply protocol; works outside tmux | `tmux-agent protocol` |
 | `tmux-agent list` | Show all panes with target, pid, command, size, label | `tmux-agent list` |
 | `tmux-agent type <target> <text>` | Type text without pressing Enter | `tmux-agent type codex "hello"` |
 | `tmux-agent send <target> <text>` | Read, send message, verify, and press Enter (full cycle) | `tmux-agent send codex "review src/auth.ts"` |
+| `tmux-agent task <target> <text>` | Like `send`, but appends reply/protocol instructions | `tmux-agent task codex "review src/auth.ts"` |
 | `tmux-agent send --file <target> <text>` | File-based transport; auto-selected if payload >2KB | `tmux-agent send --file codex "large text"` |
 | `tmux-agent send --path <target> <file>` | Read file and send via file transport (avoids shell ARG_MAX) | `tmux-agent send --path codex large-diff.txt` |
 | `tmux-agent message <target> <text>` | Type text with auto sender info and reply target | `tmux-agent message codex "review src/auth.ts"` |
@@ -143,6 +145,21 @@ Prefer `send` — it runs the full cycle automatically:
 tmux-agent send codex 'Please review the changes in src/auth.ts'
 # STOP. Do NOT read codex to check for a reply.
 # The other agent will reply via tmux-agent into YOUR pane.
+```
+
+Use `task` when the receiver may not have loaded the agent-mux skill yet. It
+uses the same transport behavior as `send` and appends reply/protocol
+instructions:
+
+```bash
+tmux-agent task codex 'Please review the installer changes and reply with risks.'
+```
+
+The receiver sees a footer like:
+
+```text
+[agent-mux] To reply: tmux-agent send %4 'your response'
+[agent-mux] Protocol: tmux-agent protocol
 ```
 
 Manual cycle (when you need to inspect between steps):

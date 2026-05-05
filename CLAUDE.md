@@ -15,6 +15,10 @@ Project memory lives in `.claude/memory/` (gitignored). Read `MEMORY.md` there f
 3. `install.sh` — curl-installable setup script
 4. `skills/agent-mux/SKILL.md` — agent integration documentation (installed to both `skills/` and `.claude/skills/`)
 
+agent-mux is not a memory system, RAG layer, or codebase knowledge graph. Keep
+the core focused on tmux workspace management, cross-pane protocol, and concise
+agent instructions.
+
 ## Installation & Update
 
 ```bash
@@ -57,7 +61,9 @@ Manual smoke checks when needed:
 
 ```bash
 tmux-agent doctor
+tmux-agent protocol
 tmux-agent list
+tmux-agent task <pane-target> "task with reply instructions"
 tmux-agent read <pane-target>
 tmux-agent type <pane-target> "text"
 tmux-agent keys <pane-target> Enter
@@ -88,7 +94,7 @@ Pane targets accept: tmux natives (`%3`, `session:window.pane`, window index `0`
 ```
 [tmux-agent v1 from=<sender> pane=<pane-id> at=<session:window.pane> msg=<id> reply=<pane-id>]
 ```
-This lets recipient agents reply directly using the `reply=` pane ID. Agents must **not** poll or wait after sending — the recipient replies into the sender's pane.
+This lets recipient agents reply directly using the `reply=` pane ID. Agents must **not** poll or wait after sending — the recipient replies into the sender's pane. Use `tmux-agent task` when the receiver may not know this protocol yet.
 
 ### Socket detection order
 

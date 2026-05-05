@@ -17,7 +17,7 @@ case "$url" in
   */tmux-agent)             printf '#!/usr/bin/env bash\necho "mock tmux-agent"\n' > "$dest"; chmod +x "$dest" ;;
   */install.sh)             printf '#!/usr/bin/env bash\nVERSION="1.4.0"\necho "mock agent-mux"\n'  > "$dest"; chmod +x "$dest" ;;
   *.conf)                   echo "# mock tmux.conf" > "$dest" ;;
-  *.md|*/SKILL.md)          echo "# mock skill"     > "$dest" ;;
+  *.md|*/SKILL.md)          echo "# mock skill: tmux-agent protocol" > "$dest" ;;
   *.txt)                    echo "mock help"         > "$dest" ;;
   *)                        echo "# mock: $url"      > "$dest" ;;
 esac
