@@ -2,7 +2,7 @@
 # agent-mux — one-command tmux setup
 set -euo pipefail
 
-VERSION="1.9.4"
+VERSION="1.9.5"
 REPO="maxto/agent-mux"
 BRANCH="v${VERSION}"
 BASE_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"

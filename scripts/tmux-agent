@@ -3,7 +3,7 @@
 # Any tool that can run bash can use this to talk to other panes.
 set -euo pipefail
 
-VERSION="1.9.4"
+VERSION="1.9.5"
 
 # --- Helpers ---
 
@@ -1122,9 +1122,11 @@ case "$1" in
   resume)    shift; cmd_resume "$@"; exit ;;
   status)    shift; cmd_status "$@"; exit ;;
   audit)     shift; cmd_audit  "$@"; exit ;;
+  list|type|send|message|msg|read|keys|name|resolve|doctor) ;;
+  *)         die "unknown command: $1. Run 'tmux-agent --help' for usage." ;;
 esac
 
-# All other commands need the socket
+# Remaining commands need the socket
 require_tmux
 init_socket
 
@@ -1138,5 +1140,4 @@ case "$1" in
   name)    shift; cmd_name "$@" ;;
   resolve) shift; cmd_resolve "$@" ;;
   doctor)  shift; cmd_doctor "$@" ;;
-  *)       die "unknown command: $1. Run 'tmux-agent --help' for usage." ;;
 esac

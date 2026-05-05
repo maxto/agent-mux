@@ -8,7 +8,7 @@ Project memory lives in `.claude/memory/` (gitignored). Read `MEMORY.md` there f
 
 ## What This Is
 
-**agent-mux** is a one-command tmux setup with a cross-pane CLI (`tmux-agent`) designed for AI agent terminal automation. Three deliverables:
+**agent-mux** is a one-command tmux setup with a cross-pane CLI (`tmux-agent`) designed for AI agent terminal automation. Four deliverables:
 
 1. `.tmux.conf` — opinionated tmux config with Option-key bindings
 2. `scripts/tmux-agent` — bash CLI for reading/writing across tmux panes
@@ -86,9 +86,9 @@ Pane targets accept: tmux natives (`%3`, `session:window.pane`, window index `0`
 
 `tmux-agent message` auto-prepends a header:
 ```
-[tmux-agent from:<sender> pane:<pane-id> at:<session:window.pane> - load the agent-mux skill to reply]
+[tmux-agent v1 from=<sender> pane=<pane-id> at=<session:window.pane> msg=<id> reply=<pane-id>]
 ```
-This lets recipient agents reply directly by pane ID. Agents must **not** poll or wait after sending — the recipient replies into the sender's pane.
+This lets recipient agents reply directly using the `reply=` pane ID. Agents must **not** poll or wait after sending — the recipient replies into the sender's pane.
 
 ### Socket detection order
 
