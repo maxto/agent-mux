@@ -30,10 +30,21 @@ teardown() {
   run bash "$TMUX_AGENT" task "$TARGET_PANE" "review docs"
   [ "$status" -eq 0 ]
 
-  pane_text=$(tmux -S "$SOCKET" capture-pane -t "$TARGET_PANE" -p -J)
+  pane_text=$(tmux -S "$SOCKET" capture-pane -t "$TARGET_PANE" -p -J -S -200)
   [[ "$pane_text" == *"review docs"* ]]
-  [[ "$pane_text" == *"To reply: tmux-agent send $SENDER_PANE 'your response'"* ]]
-  [[ "$pane_text" == *"Protocol: tmux-agent protocol"* ]]
+  [[ "$pane_text" == *"tmux-agent send $SENDER_PANE 'your response'"* ]]
+  [[ "$pane_text" == *"Do not wait, sleep, or poll panes for replies"* ]]
+  [[ "$pane_text" == *"Full protocol: tmux-agent protocol"* ]]
+}
+
+@test "task footer shares the no-poll rule with protocol (DRY)" {
+  run bash "$TMUX_AGENT" task "$TARGET_PANE" "review docs"
+  [ "$status" -eq 0 ]
+  rule="Do not wait, sleep, or poll panes for replies; reply then end your turn."
+  proto=$(bash "$TMUX_AGENT" protocol)
+  [[ "$proto" == *"$rule"* ]]
+  pane_text=$(tmux -S "$SOCKET" capture-pane -t "$TARGET_PANE" -p -J -S -200)
+  [[ "$pane_text" == *"$rule"* ]]
 }
 
 @test "task auto-spills through thread transport when threshold is 0" {
@@ -41,16 +52,15 @@ teardown() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"thread: "* ]]
 
-  pane_text=$(tmux -S "$SOCKET" capture-pane -t "$TARGET_PANE" -p -J)
+  pane_text=$(tmux -S "$SOCKET" capture-pane -t "$TARGET_PANE" -p -J -S -200)
   [[ "$pane_text" == *"kind=thread"* ]]
-  [[ "$pane_text" == *"To reply: tmux-agent send $SENDER_PANE 'your response'"* ]]
-  [[ "$pane_text" == *"Protocol: tmux-agent protocol"* ]]
 
   thread_id=$(printf '%s' "$output" | sed -n 's/^thread: //p')
   thread_file="$XDG_RUNTIME_DIR/threads/$thread_id/messages/000001.md"
   [ -f "$thread_file" ]
   grep -q "review docs" "$thread_file"
-  grep -q "Protocol: tmux-agent protocol" "$thread_file"
+  grep -q "tmux-agent send $SENDER_PANE 'your response'" "$thread_file"
+  grep -q "Full protocol: tmux-agent protocol" "$thread_file"
 }
 
 @test "task preserves reserved header guard" {

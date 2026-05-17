@@ -9,6 +9,24 @@ TMUX_AGENT="$BATS_TEST_DIRNAME/../../scripts/tmux-agent"
   [[ "$output" == *"send <target> <text>"* ]]
 }
 
+@test "--help is the canonical command + read-guard reference" {
+  run bash "$TMUX_AGENT" --help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Read guard:"* ]]
+  [[ "$output" == *"pause [reason]"* ]]
+  [[ "$output" == *"audit tail|grep|stats"* ]]
+  [[ "$output" == *"Target resolution:"* ]]
+  [[ "$output" == *"tmux-agent protocol"* ]]
+}
+
+@test "protocol documents header fields and trust model" {
+  unset TMUX TMUX_PANE TMUX_AGENT_SOCKET
+  run bash "$TMUX_AGENT" protocol
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Header fields:"* ]]
+  [[ "$output" == *"Trust:"* ]]
+}
+
 @test "help subcommand points users to --help" {
   run bash "$TMUX_AGENT" help
   [ "$status" -ne 0 ]

@@ -2,7 +2,7 @@
 # agent-mux — one-command tmux setup
 set -euo pipefail
 
-VERSION="1.10.3"
+VERSION="1.10.4"
 REPO="maxto/agent-mux"
 BRANCH="v${VERSION}"
 BASE_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
@@ -534,9 +534,7 @@ install_skill() {
   info "Installing agent-mux skill to ${neutral_dir/#$HOME/\~}..."
   mkdir -p "$neutral_dir/references"
   download "$source_url/skills/agent-mux/SKILL.md"                    "$neutral_dir/SKILL.md"
-  download "$source_url/skills/agent-mux/references/protocol.md"      "$neutral_dir/references/protocol.md"
   download "$source_url/skills/agent-mux/references/orchestration.md" "$neutral_dir/references/orchestration.md"
-  download "$source_url/skills/agent-mux/references/tmux-agent.md"   "$neutral_dir/references/tmux-agent.md"
   download "$source_url/skills/agent-mux/references/tmux.md"          "$neutral_dir/references/tmux.md"
 
   # Claude Code path — enables /agent-mux slash command
@@ -544,9 +542,7 @@ install_skill() {
   info "Installing Claude Code skill to ${claude_dir/#$HOME/\~}..."
   mkdir -p "$claude_dir/references"
   download "$source_url/skills/agent-mux/SKILL.md"                    "$claude_dir/SKILL.md"
-  download "$source_url/skills/agent-mux/references/protocol.md"      "$claude_dir/references/protocol.md"
   download "$source_url/skills/agent-mux/references/orchestration.md" "$claude_dir/references/orchestration.md"
-  download "$source_url/skills/agent-mux/references/tmux-agent.md"   "$claude_dir/references/tmux-agent.md"
   download "$source_url/skills/agent-mux/references/tmux.md"          "$claude_dir/references/tmux.md"
 }
 
