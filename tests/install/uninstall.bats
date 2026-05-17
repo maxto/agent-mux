@@ -93,3 +93,20 @@ teardown() {
   run bash "$INSTALL_SH" uninstall
   [ "$status" -eq 0 ]
 }
+
+@test "uninstall removes our user-wide Claude skill" {
+  mkdir -p "$HOME/.claude/skills/agent-mux"
+  printf -- '---\nname: agent-mux\n---\n' > "$HOME/.claude/skills/agent-mux/SKILL.md"
+  run bash "$INSTALL_SH" uninstall
+  [ "$status" -eq 0 ]
+  [ ! -e "$HOME/.claude/skills/agent-mux" ]
+}
+
+@test "uninstall preserves a same-named skill not installed by agent-mux" {
+  mkdir -p "$HOME/.claude/skills/agent-mux"
+  echo "# my own skill" > "$HOME/.claude/skills/agent-mux/SKILL.md"
+  run bash "$INSTALL_SH" uninstall
+  [ "$status" -eq 0 ]
+  [ -f "$HOME/.claude/skills/agent-mux/SKILL.md" ]
+  grep -q "my own skill" "$HOME/.claude/skills/agent-mux/SKILL.md"
+}

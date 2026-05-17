@@ -2,7 +2,7 @@
 # agent-mux — one-command tmux setup
 set -euo pipefail
 
-VERSION="1.10.4"
+VERSION="1.10.5"
 REPO="maxto/agent-mux"
 BRANCH="v${VERSION}"
 BASE_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
@@ -11,6 +11,7 @@ SMUX_DIR="$HOME/.agent-mux"
 BIN_DIR="$SMUX_DIR/bin"
 BACKUP_DIR="$SMUX_DIR/backups"
 TMUX_XDG_DIR="$HOME/.config/tmux"
+CLAUDE_USER_SKILL_DIR="$HOME/.claude/skills/agent-mux"
 
 # --- Colors ---
 RED='\033[0;31m'
@@ -149,7 +150,7 @@ tmux_cmd() {
 
 session_usage() {
   cat <<'EOF'
-agent-mux session — bootstrap a tmux layout for multi-agent work
+agent-mux session — create a detached tmux session
 
 Usage:
   agent-mux session start [--name <session>] [--labels a,b,c] [--cmds x,y,z]
@@ -157,15 +158,17 @@ Usage:
   agent-mux session kill --name <session>
 
 Defaults:
-  --name agents
-  --labels coordinator,worker1,worker2
+  --name agent
+  --labels (none) — a single-pane session
 
 Behavior:
   Running 'agent-mux session' without a subcommand is safe: it only prints this help.
-  Labels may contain any number of panes. Commands are optional and must match label count.
+  Always creates a NEW detached session; never splits the current window, even
+  when run from inside tmux. Errors if a session with that name already exists.
+  With no --labels: one pane, no labels. With --labels: one pane per label,
+  split and labeled. --cmds requires --labels and must match the label count.
   --cmds is comma-separated; commands containing literal commas are not supported.
-  Outside tmux: creates and labels the session (without attaching). Use 'agent-mux attach' to enter it.
-  Inside tmux: run from the pane you want as the first label; missing panes are created as splits.
+  The session is not attached. Enter it with 'agent-mux attach <name>'.
 EOF
 }
 
@@ -230,12 +233,6 @@ current_tmux_pane() {
   tmux_cmd display-message -t "$TMUX_PANE" -p '#{pane_id}' 2>/dev/null
 }
 
-find_labeled_pane_in_window() {
-  local window="$1" label="$2"
-  tmux_cmd list-panes -t "$window" -F '#{pane_id}|#{@name}' 2>/dev/null \
-    | awk -F'|' -v lbl="$label" '$2 == lbl { print $1; exit }'
-}
-
 label_pane() {
   local pane="$1" label="$2"
   tmux_cmd set-option -p -t "$pane" @name "$label" >/dev/null
@@ -259,41 +256,12 @@ print_session_layout() {
   done
 }
 
-cmd_session_start_inside() {
-  local current_pane="$1"
-  local current_window last_pane pane label i
-  current_window=$(tmux_cmd display-message -t "$current_pane" -p '#{window_id}')
-
-  SESSION_PANES=()
-  last_pane="$current_pane"
-
-  for i in "${!SESSION_LABELS[@]}"; do
-    label="${SESSION_LABELS[$i]}"
-    if (( i == 0 )); then
-      pane="$current_pane"
-    else
-      pane=$(find_labeled_pane_in_window "$current_window" "$label")
-      if [[ -z "$pane" ]]; then
-        pane=$(tmux_cmd split-window -h -t "$last_pane" -PF '#{pane_id}')
-      fi
-    fi
-
-    label_pane "$pane" "$label"
-    SESSION_PANES+=("$pane")
-    last_pane="$pane"
-  done
-
-  tmux_cmd select-layout -t "$current_window" tiled >/dev/null 2>&1 || true
-  launch_session_commands
-  print_session_layout
-}
-
+# Always creates a NEW detached session, separate from the caller's tmux
+# session/window. Errors if a session with the same name already exists.
 cmd_session_start_outside() {
   local session_name="$1"
   if tmux_cmd has-session -t "$session_name" 2>/dev/null; then
-    info "Session '$session_name' already exists. Run: agent-mux attach $session_name"
-    echo "Run 'agent-mux session start' inside tmux to apply labels if needed."
-    return
+    error "session '$session_name' already exists. Attach with: agent-mux attach $session_name"
   fi
 
   local pane last_pane i
@@ -301,6 +269,11 @@ cmd_session_start_outside() {
   pane=$(tmux_cmd new-session -d -s "$session_name" -n "$session_name" -PF '#{pane_id}')
   SESSION_PANES+=("$pane")
   last_pane="$pane"
+
+  if (( ${#SESSION_LABELS[@]} == 0 )); then
+    info "Created tmux session '$session_name' (1 pane). Attach with: agent-mux attach $session_name"
+    return
+  fi
 
   for i in "${!SESSION_LABELS[@]}"; do
     if (( i == 0 )); then
@@ -317,7 +290,7 @@ cmd_session_start_outside() {
   launch_session_commands
   print_session_layout
 
-  info "Created tmux session '$session_name'. Run: agent-mux attach $session_name"
+  info "Created tmux session '$session_name'. Attach with: agent-mux attach $session_name"
 }
 
 cmd_session_list() {
@@ -360,8 +333,8 @@ cmd_session_kill() {
 }
 
 cmd_session_start() {
-  local session_name="agents"
-  local labels="coordinator,worker1,worker2"
+  local session_name="agent"
+  local labels=""
   local cmds=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -387,23 +360,21 @@ cmd_session_start() {
 
   [[ "$session_name" =~ ^[A-Za-z0-9._-]+$ ]] || error "invalid session name '$session_name'"
   require_tmux_binary
-  parse_session_labels "$labels"
+  SESSION_LABELS=()
+  [[ -n "$labels" ]] && parse_session_labels "$labels"
   SESSION_CMDS=()
   if [[ -n "$cmds" ]]; then
+    [[ ${#SESSION_LABELS[@]} -gt 0 ]] || error "--cmds requires --labels"
     parse_session_cmds "$cmds"
     (( ${#SESSION_CMDS[@]} == ${#SESSION_LABELS[@]} )) || error "--cmds count must match --labels count"
   fi
 
-  local current_pane
-  if current_pane=$(current_tmux_pane); then
-    cmd_session_start_inside "$current_pane"
-  else
-    cmd_session_start_outside "$session_name"
-  fi
+  # Always create a new detached session, separate from the caller's window.
+  cmd_session_start_outside "$session_name"
 }
 
 cmd_attach() {
-  local session_name="agents"
+  local session_name="agent"
   local name_set=false
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -529,21 +500,38 @@ install_skill() {
   local project_dir="$1"
   local source_url="${2:-$BASE_URL}"
 
-  # Neutral path — readable by any agent (Codex /init, Gemini @path, aider /add, etc.)
+  # Neutral path — readable by any non-Claude agent (Codex, Gemini, local models, etc.)
+  # The Claude Code skill is installed user-wide (install_user_skill), so /agent-mux
+  # works in every folder without a per-project copy.
   local neutral_dir="$project_dir/skills/agent-mux"
   info "Installing agent-mux skill to ${neutral_dir/#$HOME/\~}..."
   mkdir -p "$neutral_dir/references"
   download "$source_url/skills/agent-mux/SKILL.md"                    "$neutral_dir/SKILL.md"
   download "$source_url/skills/agent-mux/references/orchestration.md" "$neutral_dir/references/orchestration.md"
   download "$source_url/skills/agent-mux/references/tmux.md"          "$neutral_dir/references/tmux.md"
+}
 
-  # Claude Code path — enables /agent-mux slash command
-  local claude_dir="$project_dir/.claude/skills/agent-mux"
-  info "Installing Claude Code skill to ${claude_dir/#$HOME/\~}..."
-  mkdir -p "$claude_dir/references"
-  download "$source_url/skills/agent-mux/SKILL.md"                    "$claude_dir/SKILL.md"
-  download "$source_url/skills/agent-mux/references/orchestration.md" "$claude_dir/references/orchestration.md"
-  download "$source_url/skills/agent-mux/references/tmux.md"          "$claude_dir/references/tmux.md"
+# User-wide Claude Code skill — enables /agent-mux in every project/folder.
+install_user_skill() {
+  local source_url="${1:-$BASE_URL}"
+  info "Installing Claude Code skill to ${CLAUDE_USER_SKILL_DIR/#$HOME/\~}..."
+  mkdir -p "$CLAUDE_USER_SKILL_DIR/references"
+  download "$source_url/skills/agent-mux/SKILL.md"                    "$CLAUDE_USER_SKILL_DIR/SKILL.md"
+  download "$source_url/skills/agent-mux/references/orchestration.md" "$CLAUDE_USER_SKILL_DIR/references/orchestration.md"
+  download "$source_url/skills/agent-mux/references/tmux.md"          "$CLAUDE_USER_SKILL_DIR/references/tmux.md"
+}
+
+# Remove the user-wide skill only if it is ours (don't clobber a user's own
+# same-named skill).
+remove_user_skill() {
+  [[ -d "$CLAUDE_USER_SKILL_DIR" ]] || return 0
+  if [[ -f "$CLAUDE_USER_SKILL_DIR/SKILL.md" ]] && \
+     grep -q '^name: agent-mux$' "$CLAUDE_USER_SKILL_DIR/SKILL.md" 2>/dev/null; then
+    rm -rf "$CLAUDE_USER_SKILL_DIR"
+    info "Removed ${CLAUDE_USER_SKILL_DIR/#$HOME/\~}"
+  else
+    info "Keeping user-managed ${CLAUDE_USER_SKILL_DIR/#$HOME/\~} (not installed by agent-mux)"
+  fi
 }
 
 install_tmux_config() {
@@ -616,12 +604,15 @@ cmd_global_install() {
   mv "$BIN_DIR/agent-mux.tmp" "$BIN_DIR/agent-mux"
   chmod +x "$BIN_DIR/agent-mux"
 
-  # 6. Install tmux config by default
+  # 6. Install user-wide Claude Code skill (/agent-mux in every folder)
+  install_user_skill "$BASE_URL"
+
+  # 7. Install tmux config by default
   if [[ "$with_config" == true ]]; then
     install_tmux_config "$BASE_URL"
   fi
 
-  # 7. Ensure PATH
+  # 8. Ensure PATH
   ensure_path
 
   echo ""
@@ -629,6 +620,7 @@ cmd_global_install() {
   echo ""
   echo "  tmux-agent:     ~/.agent-mux/bin/tmux-agent"
   echo "  agent-mux CLI:  ~/.agent-mux/bin/agent-mux"
+  echo "  Claude skill:   ~/.claude/skills/agent-mux  (/agent-mux in every folder)"
   if [[ "$with_config" == true ]]; then
     echo "  Config:         ~/.agent-mux/tmux.conf"
   else
@@ -636,8 +628,9 @@ cmd_global_install() {
     warn "Alt controls and red pane borders require the agent-mux tmux config."
   fi
   echo ""
-  echo "  Next: cd your-project && agent-mux install"
-  echo "  Then: agent-mux --help"
+  echo "  In Claude Code (any folder): /agent-mux"
+  echo "  For non-Claude agents in a repo: cd your-project && agent-mux install"
+  echo "  Reference: agent-mux --help"
   if ! echo "$PATH" | tr ':' '\n' | grep -qx "$BIN_DIR"; then
     echo ""
     warn "Restart your shell or run: export PATH=\"\$HOME/.agent-mux/bin:\$PATH\""
@@ -669,9 +662,10 @@ cmd_install() {
     i=$(( i + 1 ))
   done
 
-  info "Installing agent-mux skill into ${project_dir/#$HOME/\~}..."
+  info "Installing agent-mux neutral skill into ${project_dir/#$HOME/\~}..."
 
-  # 1. Install skill (neutral + Claude Code paths)
+  # 1. Install the neutral skill for non-Claude agents in this repo.
+  #    Claude's /agent-mux is user-wide (installed by curl|bash), not per-project.
   install_skill "$project_dir"
 
   # 2. Download and symlink tmux config by default
@@ -680,21 +674,19 @@ cmd_install() {
   fi
 
   local neutral_rel="${project_dir/#$HOME/\~}/skills/agent-mux"
-  local claude_rel="${project_dir/#$HOME/\~}/.claude/skills/agent-mux"
   echo ""
-  printf '%b\n' "${GREEN}${BOLD}agent-mux skill installed!${NC}"
+  printf '%b\n' "${GREEN}${BOLD}agent-mux neutral skill installed!${NC}"
   echo ""
-  echo "  skill (neutral):  $neutral_rel"
-  echo "  skill (claude):   $claude_rel"
+  echo "  skill (neutral, non-Claude agents): $neutral_rel"
   if [[ "$with_config" == true ]]; then
-    echo "  Config:           ~/.agent-mux/tmux.conf"
+    echo "  Config:                             ~/.agent-mux/tmux.conf"
   else
     echo ""
-    echo "  Config:           skipped (--no-config)"
+    echo "  Config:                             skipped (--no-config)"
     warn "Alt controls and red pane borders require the agent-mux tmux config."
   fi
   echo ""
-  echo "  In Claude Code: /agent-mux"
+  echo "  Claude Code: /agent-mux works in any folder (user-wide skill)."
 }
 
 cmd_update() {
@@ -714,8 +706,11 @@ cmd_update() {
   mv "$BIN_DIR/agent-mux.tmp" "$BIN_DIR/agent-mux"
   chmod +x "$BIN_DIR/agent-mux"
 
-  if [[ -d "$PWD/.claude/skills/agent-mux" ]] || [[ -d "$PWD/skills/agent-mux" ]]; then
-    info "Updating agent-mux skill..."
+  info "Updating user-wide Claude Code skill..."
+  install_user_skill "$MAIN_URL"
+
+  if [[ -d "$PWD/skills/agent-mux" ]]; then
+    info "Updating agent-mux neutral skill..."
     install_skill "$PWD" "$MAIN_URL"
   fi
 
@@ -781,6 +776,9 @@ cmd_uninstall() {
     cp "$latest_legacy" "$HOME/.tmux.conf"
   fi
 
+  # Remove the user-wide Claude Code skill (only if it is ours)
+  remove_user_skill
+
   # Remove agent-mux directory
   rm -rf "$SMUX_DIR"
   info "Removed ~/.agent-mux/"
@@ -803,25 +801,27 @@ agent-mux — one-command tmux setup
 Usage: agent-mux <command> [flags]
 
 Commands:
-  install [--no-config]              Install the agent-mux skill into the current project
-    [--project-dir <path>]             Installs skill into two paths (current dir or --project-dir):
-                                         skills/agent-mux/        neutral — any agent
-                                         .claude/skills/agent-mux/ Claude Code /agent-mux
+  install [--no-config]              Install the neutral skill into the current project
+    [--project-dir <path>]             Writes skills/agent-mux/ (current dir or --project-dir)
+                                         for any non-Claude agent (Codex, Gemini, …).
+                                         Claude's /agent-mux is user-wide (installed by
+                                         curl|bash) and works in every folder already.
                                        Installs the agent-mux tmux config by default
                                        and symlinks it to ~/.config/tmux/tmux.conf.
                                        Your existing config is backed up to ~/.agent-mux/backups/.
                                        --no-config: keep your tmux config untouched.
                                        --with-config is accepted for compatibility.
   update                    Update tmux-agent, agent-mux CLI, and tmux.conf to latest
-  session start             Create a tmux session layout with labeled panes (no auto-attach)
-    [--name <session>]        Default session name: agents
-    [--labels a,b,c]          One pane per label; default: coordinator,worker1,worker2
-    [--cmds x,y,z]            Optional command per pane; count must match labels
+  session start             Create a new detached session (no auto-attach, never
+                            splits the current window; errors if it exists)
+    [--name <session>]        Default session name: agent
+    [--labels a,b,c]          One pane per label; default: none (single pane)
+    [--cmds x,y,z]            Optional command per pane; requires --labels
   session list              List tmux sessions
   session kill --name <s>   Kill a specific tmux session
   window rename <name>      Rename the current tmux window
-    [--target <window>]       Required when outside tmux; example: agents:0
-  attach [<session>]        Attach to a session by name (default: agents)
+    [--target <window>]       Required when outside tmux; example: agent:0
+  attach [<session>]        Attach to a session by name (default: agent)
     [--name <session>]        Inside tmux: uses switch-client; outside: attach-session
   open [<session>]          Alias for attach; does not create sessions
   uninstall                 Remove agent-mux and restore previous tmux config (if backed up)
@@ -867,8 +867,8 @@ Files:
   ~/.agent-mux/bin/tmux-agent         cross-pane communication CLI
   ~/.agent-mux/bin/agent-mux          this CLI
   ~/.agent-mux/backups/               config backups
-  skills/agent-mux/                   skill — neutral path (any agent)
-  .claude/skills/agent-mux/           skill — Claude Code /agent-mux slash command
+  ~/.claude/skills/agent-mux/         Claude Code skill — /agent-mux in every folder
+  skills/agent-mux/                   per-project skill — neutral path (non-Claude agents)
 EOF
 }
 

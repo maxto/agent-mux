@@ -5,7 +5,7 @@ agent-mux is tmux for humans and AI agents working in the same terminal.
 *A local multi-agent coordination layer for terminal-native AI coding workflows.*
 
 - **Humans get a friendlier tmux**: Alt-key navigation, mouse support, labeled panes, and no prefix-key muscle memory required.
-- **Agents get a shared control layer**: `tmux-agent` lets Claude Code, Codex, Gemini CLI, aider, local models, and other bash-capable agents read panes, send input, reply across panes, and hand off large payloads without pasting them inline.
+- **Agents get a shared control layer**: `tmux-agent` lets Claude Code, Codex, Gemini CLI, local models, and other bash-capable agents read panes, send input, reply across panes, and hand off large payloads without pasting them inline.
 - **Teams get parallel model workflows**: run multiple agents on the same repo for implementation, review, testing, and cross-checking without leaving tmux.
 
 agent-mux is not a memory system, RAG layer, or codebase knowledge graph. It
@@ -26,38 +26,44 @@ With agent-mux:
 - agents send messages across panes with `tmux-agent send` — no copy-paste
 - large handoffs stay on disk via thread transport; the receiver loads them only when needed
 - replies route back to the sender automatically via pane ID
-- Claude Code orchestrates (the `/agent-mux` skill auto-loads there); other agents (Codex, Gemini, DeepSeek, aider…) participate as workers
+- Claude Code orchestrates (the `/agent-mux` skill auto-loads there); other agents (Codex, Gemini, DeepSeek, local models…) participate as workers
 
 Large handoffs between agents no longer inflate the prompt. When a payload exceeds the inline threshold (default 2KB), `tmux-agent send` automatically switches to thread transport: the receiver sees only a compact ping, and the full content stays on disk until they explicitly call `tmux-agent thread read`. The threshold is configurable via `TMUX_AGENT_INLINE_THRESHOLD` — set it to `0` to always use file transport regardless of size.
 
 ## Quickstart
 
 ```bash
-# 1. Install global tools — once per machine (also installs tmux if missing)
+# 1. Install once per machine (also installs tmux if missing, and the
+#    user-wide Claude skill so /agent-mux works in EVERY folder)
 curl -fsSL https://maxto.github.io/agent-mux/install.sh | bash
 source ~/.bashrc   # or open a new terminal
 
-# 2. Create a labeled agent-mux session, then enter it
-agent-mux session start --name agents --labels coordinator,worker1,worker2
-agent-mux attach agents
+# 2. Create a session (defaults to a single-pane session named 'agent'),
+#    then enter it
+agent-mux session start
+agent-mux attach agent
 
-# 3. Install the skill — once per project
-cd your-project
-agent-mux install
-
-# 4. In Claude Code, load the skill
+# 3. In Claude Code (any folder, no per-project install needed):
 /agent-mux
 ```
 
-Your coordinator agent now knows how to use `tmux-agent` to talk to other panes, launch agents, and coordinate work.
+Claude now knows how to use `tmux-agent` to talk to other panes, launch agents, and coordinate work. `/agent-mux` is available in any project because the skill is installed user-wide by the `curl | bash` step — you do not re-run anything per project for Claude.
 
-For a practical multi-agent layout, choose any labels and commands you use locally:
+For a multi-agent layout, pass explicit labels (and optional per-pane commands). `session start` always creates a **new detached session** and never splits your current window; it errors if the name is already taken:
 
 ```bash
 agent-mux session start \
   --name agents \
   --labels coordinator,codex,gemini \
   --cmds claude,codex,gemini
+agent-mux attach agents
+```
+
+To let any non-Claude agent (Codex, Gemini, local models, …) in a repo discover `tmux-agent`, drop the neutral skill into that project:
+
+```bash
+cd your-project
+agent-mux install   # writes skills/agent-mux/ for non-Claude agents
 ```
 
 ## Example
@@ -120,7 +126,7 @@ inspect recent sends during debugging.
 | Role | Description |
 |---|---|
 | **Orchestrator** | Claude Code — the `/agent-mux` skill auto-loads there; it decomposes work, delegates, and integrates replies |
-| **Workers** | Codex, Gemini, DeepSeek, aider, local models — receive tasks and reply; they participate, they don't coordinate |
+| **Workers** | Codex, Gemini, DeepSeek, local models — receive tasks and reply; they participate, they don't coordinate |
 | **tmux-agent** | The message bus — routes messages between panes |
 | **Thread transport** | Large artifact channel — keeps diffs, logs, and file content out of prompt context |
 
@@ -148,7 +154,7 @@ Use your agent's native memory system for persistent project facts. Use `tmux-ag
 curl -fsSL https://maxto.github.io/agent-mux/install.sh | bash
 ```
 
-Installs `tmux-agent` and `agent-mux` into `~/.agent-mux/bin/` and adds them to your PATH. Also installs tmux if missing. By default it installs the agent-mux tmux config, backs up any existing config, and symlinks it at `~/.config/tmux/tmux.conf`.
+Installs `tmux-agent` and `agent-mux` into `~/.agent-mux/bin/` and adds them to your PATH. Also installs tmux if missing, and installs the Claude Code skill **user-wide** at `~/.claude/skills/agent-mux/` so `/agent-mux` works in every folder without a per-project step. By default it installs the agent-mux tmux config, backs up any existing config, and symlinks it at `~/.config/tmux/tmux.conf`.
 
 > The installer modifies your shell rc file (`~/.bashrc` or `~/.zshrc`) to add `~/.agent-mux/bin` to PATH, may install tmux or xclip via your package manager if they are missing, and may manage `~/.config/tmux/tmux.conf` unless you pass `--no-config`.
 
@@ -158,14 +164,16 @@ To keep your tmux config untouched during global install:
 curl -fsSL https://maxto.github.io/agent-mux/install.sh | bash -s -- --no-config
 ```
 
-### Per-project skill (once per project)
+### Per-project skill — only for non-Claude agents
+
+Claude's `/agent-mux` is already global after the step above. Run this only when you want any non-Claude agent (Codex, Gemini, local models, …) in a specific repo to discover `tmux-agent`:
 
 ```bash
 cd your-project
 agent-mux install
 ```
 
-Installs the skill into two paths: `skills/agent-mux/` (neutral, any agent) and `.claude/skills/agent-mux/` (Claude Code `/agent-mux` slash command), and ensures the tmux config is installed unless you pass `--no-config`. This teaches any AI agent how to use `tmux-agent` — without it, they don't know the tool exists.
+Writes the neutral skill to `skills/agent-mux/` and ensures the tmux config is installed unless you pass `--no-config`. Without it, non-Claude agents in that repo don't know `tmux-agent` exists.
 
 ### tmux config
 
@@ -193,17 +201,17 @@ agent-mux install --config=false
 
 | Command | Description |
 |---|---|
-| `agent-mux install` | Install the `/agent-mux` skill into `$PWD` and install the tmux config by default |
-| `agent-mux install --no-config` | Install the skill but leave the user's tmux config untouched |
+| `agent-mux install` | Install the neutral skill into `$PWD` (for non-Claude agents) and install the tmux config by default. Claude's `/agent-mux` is already user-wide |
+| `agent-mux install --no-config` | Install the neutral skill but leave the user's tmux config untouched |
 | `agent-mux install --with-config` | Accepted for compatibility; config install is already the default |
-| `agent-mux install --project-dir <path>` | Install the skill into `<path>` instead of `$PWD` |
-| `agent-mux update` | Re-download tmux-agent and agent-mux CLI; refreshes tmux config only when `~/.config/tmux/tmux.conf` is managed by agent-mux; refreshes skill if present in `$PWD` |
+| `agent-mux install --project-dir <path>` | Install the neutral skill into `<path>` instead of `$PWD` |
+| `agent-mux update` | Re-download tmux-agent and agent-mux CLI; refresh the user-wide Claude skill; refresh tmux config only when `~/.config/tmux/tmux.conf` is managed by agent-mux; refresh the neutral skill if present in `$PWD` |
 | `agent-mux session` | Show session help; does not create panes or attach |
-| `agent-mux session start [--name agents] [--labels a,b,c] [--cmds x,y,z]` | Create a tmux session layout with one pane per label; commands are optional; does not attach |
+| `agent-mux session start [--name agent] [--labels a,b,c] [--cmds x,y,z]` | Create a **new detached** session (default name `agent`, single pane). With `--labels`: one pane per label. Never splits the current window; errors if the name exists; does not attach |
 | `agent-mux session list` | List tmux sessions |
 | `agent-mux session kill --name <session>` | Kill a specific tmux session |
 | `agent-mux window rename <name> [--target <window>]` | Rename the current tmux window; pass `--target` when outside tmux |
-| `agent-mux attach [session]` | Attach or switch to an existing session; default: `agents` |
+| `agent-mux attach [session]` | Attach or switch to an existing session; default: `agent` |
 | `agent-mux open [session]` | Alias for `attach`; does not create sessions |
 | `agent-mux uninstall` | Remove `~/.agent-mux/`, restore previous tmux config file or symlink from backup when available. Note: does not remove the `PATH` line added to your shell rc file. |
 | `agent-mux version` | Print version |
@@ -217,8 +225,8 @@ agent-mux install --config=false
 | `~/.agent-mux/bin/agent-mux` | agent-mux CLI |
 | `~/.agent-mux/tmux.conf` | tmux config (downloaded by default) |
 | `~/.agent-mux/backups/` | Config backups and previous symlink targets |
-| `skills/agent-mux/` | Skill — neutral path, readable by any agent |
-| `.claude/skills/agent-mux/` | Skill — Claude Code `/agent-mux` slash command |
+| `~/.claude/skills/agent-mux/` | Claude Code skill — `/agent-mux` in every folder (user-wide) |
+| `skills/agent-mux/` | Per-project skill — neutral path for non-Claude agents |
 
 ## Controls
 
@@ -440,13 +448,13 @@ frameworks and ownership templates live in
 
 A **skill** is a markdown file loaded into an agent's context that explains how to use a tool — in this case, how to use `tmux-agent` to read panes, send messages, and coordinate with other agents. The top-level skill is intentionally short and points agents to specific references only when needed.
 
-`agent-mux install` copies the skill to two paths:
+The skill lives in two places:
 
-- **`skills/agent-mux/`** — neutral path, readable by any agent
-- **`.claude/skills/agent-mux/`** — Claude Code `/agent-mux` slash command
+- **`~/.claude/skills/agent-mux/`** — user-wide, installed by `curl | bash`. Makes `/agent-mux` available to Claude Code in **every** folder, no per-project step.
+- **`skills/agent-mux/`** — per-project neutral path, written by `agent-mux install`, readable by non-Claude agents in that repo.
 
 agent-mux is Claude-centric: in **Claude Code** the skill auto-loads with
-`/agent-mux`, and Claude orchestrates. Worker agents do not need the full skill
+`/agent-mux` anywhere, and Claude orchestrates. Worker agents do not need the full skill
 — `tmux-agent task` appends everything they need to reply. If you do want a
 worker to know the protocol, point it at `skills/agent-mux/SKILL.md` (paste it
 into the system prompt or use the agent's file-loading command). agent-mux does

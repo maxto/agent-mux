@@ -32,6 +32,14 @@ teardown() {
   [ -x "$HOME/.agent-mux/bin/agent-mux" ]
 }
 
+@test "global install places user-wide Claude skill in every folder" {
+  run bash "$INSTALL_SH"
+  [ "$status" -eq 0 ]
+  [ -f "$HOME/.claude/skills/agent-mux/SKILL.md" ]
+  [ -f "$HOME/.claude/skills/agent-mux/references/orchestration.md" ]
+  [ -f "$HOME/.claude/skills/agent-mux/references/tmux.md" ]
+}
+
 @test "global install does not install legacy help.txt" {
   run bash "$INSTALL_SH"
   [ "$status" -eq 0 ]

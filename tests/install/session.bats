@@ -41,12 +41,33 @@ teardown() {
   ! grep -q "new-session" "$TMUX_FIXTURE_LOG"
 }
 
-@test "session start outside tmux creates named session without attaching" {
+@test "session start with no name defaults to a single-pane 'agent' session" {
+  run bash "$INSTALL_SH" session start
+  [ "$status" -eq 0 ]
+  grep -q "new-session -d -s agent -n agent" "$TMUX_FIXTURE_LOG"
+  ! grep -q "split-window" "$TMUX_FIXTURE_LOG"
+  ! grep -q "set-option -p" "$TMUX_FIXTURE_LOG"
+  ! grep -q "attach-session" "$TMUX_FIXTURE_LOG"
+  [[ "$output" == *"Created tmux session 'agent' (1 pane)"* ]]
+  [[ "$output" == *"agent-mux attach agent"* ]]
+}
+
+@test "session start --name creates a single-pane detached session without attaching" {
   run bash "$INSTALL_SH" session start --name custom
   [ "$status" -eq 0 ]
   grep -q "new-session -d -s custom -n custom" "$TMUX_FIXTURE_LOG"
+  ! grep -q "split-window" "$TMUX_FIXTURE_LOG"
   ! grep -q "attach-session -t custom" "$TMUX_FIXTURE_LOG"
-  [[ "$output" == *"Run: agent-mux attach custom"* ]]
+  [[ "$output" == *"Attach with: agent-mux attach custom"* ]]
+}
+
+@test "session start creates a separate session even when run from inside tmux" {
+  export TMUX=/tmp/tmux-test/default,123,0
+  export TMUX_PANE=%1
+  run bash "$INSTALL_SH" session start --name fromtmux
+  [ "$status" -eq 0 ]
+  grep -q "new-session -d -s fromtmux -n fromtmux" "$TMUX_FIXTURE_LOG"
+  ! grep -q "split-window" "$TMUX_FIXTURE_LOG"
 }
 
 @test "session start outside tmux applies variable custom labels" {
@@ -58,14 +79,21 @@ teardown() {
   grep -q "@name bash" "$TMUX_FIXTURE_LOG"
 }
 
-@test "session start outside tmux leaves existing session untouched without attaching" {
+@test "session start errors if a session with that name already exists" {
   export TMUX_FIXTURE_HAS_SESSION=0
   run bash "$INSTALL_SH" session start --name existing
-  [ "$status" -eq 0 ]
+  [ "$status" -ne 0 ]
   [[ "$output" == *"already exists"* ]]
   [[ "$output" == *"agent-mux attach existing"* ]]
   ! grep -q "attach-session -t existing" "$TMUX_FIXTURE_LOG"
   ! grep -q "new-session -d -s existing" "$TMUX_FIXTURE_LOG"
+}
+
+@test "session start --cmds without --labels is rejected" {
+  run bash "$INSTALL_SH" session start --cmds "echo hi"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"--cmds requires --labels"* ]]
+  ! grep -q "new-session" "$TMUX_FIXTURE_LOG"
 }
 
 @test "session rejects empty label" {

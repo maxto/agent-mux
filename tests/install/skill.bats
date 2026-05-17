@@ -21,10 +21,10 @@ teardown() {
   [ -f "$PROJECT_DIR/skills/agent-mux/SKILL.md" ]
 }
 
-@test "agent-mux install creates claude skill path" {
+@test "agent-mux install does NOT create a per-project claude skill path" {
   run bash "$INSTALL_SH" install --project-dir "$PROJECT_DIR"
   [ "$status" -eq 0 ]
-  [ -f "$PROJECT_DIR/.claude/skills/agent-mux/SKILL.md" ]
+  [ ! -e "$PROJECT_DIR/.claude/skills/agent-mux" ]
 }
 
 @test "agent-mux install creates neutral references (orchestration + tmux only)" {
@@ -36,20 +36,10 @@ teardown() {
   [ ! -f "$PROJECT_DIR/skills/agent-mux/references/tmux-agent.md" ]
 }
 
-@test "agent-mux install creates claude references (orchestration + tmux only)" {
-  run bash "$INSTALL_SH" install --project-dir "$PROJECT_DIR"
-  [ "$status" -eq 0 ]
-  [ -f "$PROJECT_DIR/.claude/skills/agent-mux/references/orchestration.md" ]
-  [ -f "$PROJECT_DIR/.claude/skills/agent-mux/references/tmux.md" ]
-  [ ! -f "$PROJECT_DIR/.claude/skills/agent-mux/references/protocol.md" ]
-  [ ! -f "$PROJECT_DIR/.claude/skills/agent-mux/references/tmux-agent.md" ]
-}
-
 @test "agent-mux install creates compact skill entrypoint" {
   run bash "$INSTALL_SH" install --project-dir "$PROJECT_DIR"
   [ "$status" -eq 0 ]
   grep -q 'tmux-agent protocol' "$PROJECT_DIR/skills/agent-mux/SKILL.md"
-  grep -q 'tmux-agent protocol' "$PROJECT_DIR/.claude/skills/agent-mux/SKILL.md"
 }
 
 @test "agent-mux install accepts --project-dir" {

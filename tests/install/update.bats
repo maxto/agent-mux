@@ -42,3 +42,13 @@ old_installer() {
   grep -q 'raw.githubusercontent.com/maxto/agent-mux/main/skills/agent-mux/SKILL.md' "$CURL_LOG"
   ! grep -q 'raw.githubusercontent.com/maxto/agent-mux/v1.2.3/skills/agent-mux/SKILL.md' "$CURL_LOG"
 }
+
+@test "update refreshes the user-wide Claude skill even without a project skill" {
+  installer="$(old_installer)"
+
+  run bash -c 'cd "$1" && bash "$2" update' _ "$PROJECT_DIR" "$installer"
+
+  [ "$status" -eq 0 ]
+  [ -f "$HOME/.claude/skills/agent-mux/SKILL.md" ]
+  [ -f "$HOME/.claude/skills/agent-mux/references/orchestration.md" ]
+}
