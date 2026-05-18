@@ -14,6 +14,25 @@ task and integrates the results.
 - QA, Security, and Adversarial agents are read-only by default.
 - Use thread transport for long briefs, diffs, logs, and handoffs.
 
+## Sandboxed Workers (Pull Fallback)
+
+Some agents (e.g. Codex in its default sandbox) restrict the filesystem to
+their workspace. The tmux socket lives outside that workspace, so the worker
+can run commands but `tmux-agent send` fails with "cannot find a reachable
+tmux server". The delegation leg (`tmux-agent task`) still works — only the
+worker's reply leg is blocked.
+
+When a worker cannot push a reply, the orchestrator pulls instead:
+
+1. Delegate with `tmux-agent task <worker> '...'` as usual.
+2. Do not expect a `send` reply; after the worker has had time to act,
+   collect its output with `tmux-agent read <worker>`.
+3. Integrate from the captured pane output.
+
+Non-sandboxed workers reply normally via `tmux-agent send` — no change. If a
+worker must push replies, widen its sandbox to reach the tmux socket dir
+(e.g. allow `/tmp/tmux-<uid>`); otherwise treat it as a pull-only leaf.
+
 ## Coding-Team Framework
 
 ```text

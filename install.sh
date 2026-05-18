@@ -2,7 +2,7 @@
 # agent-mux — one-command tmux setup
 set -euo pipefail
 
-VERSION="1.10.5"
+VERSION="1.11.0"
 REPO="maxto/agent-mux"
 BRANCH="v${VERSION}"
 BASE_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
@@ -794,6 +794,31 @@ cmd_version() {
   echo "agent-mux $VERSION"
 }
 
+cmd_keys() {
+  cat <<'EOF'
+Keyboard shortcuts (agent-mux tmux config)
+Alt = Linux/WSL2 · Option = macOS · no prefix key
+
+Pane    Alt+i/k/j/l   navigate up/down/left/right (no wrap)
+Pane    Alt+n         new pane
+Pane    Alt+w         close pane
+Pane    Alt+o         cycle layouts
+Pane    Alt+g         mark pane
+Pane    Alt+y         swap with marked pane
+Window  Alt+m         new window
+Window  Alt+u         next window
+Window  Alt+h         previous window
+Scroll  Alt+Tab       toggle scroll mode
+Scroll  i / k         scroll up / down
+Scroll  I / K         half-page up / down
+Scroll  q / Esc       exit scroll mode
+
+Mouse   click=select pane · drag=copy to clipboard · wheel=scroll
+
+Requires the agent-mux tmux config (installed by default).
+EOF
+}
+
 cmd_cli_ref() {
   cat <<'EOF'
 agent-mux — one-command tmux setup
@@ -825,6 +850,7 @@ Commands:
     [--name <session>]        Inside tmux: uses switch-client; outside: attach-session
   open [<session>]          Alias for attach; does not create sessions
   uninstall                 Remove agent-mux and restore previous tmux config (if backed up)
+  keys                      Show keyboard shortcuts (agent-mux tmux config)
   version                   Print version
   --help, -h                Show this CLI reference
 
@@ -895,6 +921,7 @@ case "${1:-}" in
   window)                          cmd_window "${@:2}" ;;
   attach|open)                     cmd_attach "${@:2}" ;;
   uninstall|remove)                cmd_uninstall ;;
+  keys|controls)                   cmd_keys ;;
   version|--version|-v|-V)         cmd_version ;;
   --help|-h)                       cmd_cli_ref ;;
   *)                               error "Unknown command: $1. Run 'agent-mux --help' for usage." ;;

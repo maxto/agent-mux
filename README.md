@@ -126,7 +126,7 @@ inspect recent sends during debugging.
 | Role | Description |
 |---|---|
 | **Orchestrator** | Claude Code — the `/agent-mux` skill auto-loads there; it decomposes work, delegates, and integrates replies |
-| **Workers** | Codex, Gemini, DeepSeek, local models — receive tasks and reply; they participate, they don't coordinate |
+| **Workers** | Codex, Gemini, DeepSeek, local models — receive tasks and reply; they participate, they don't coordinate. Sandboxed workers may be pull-only — see [`orchestration.md`](skills/agent-mux/references/orchestration.md) |
 | **tmux-agent** | The message bus — routes messages between panes |
 | **Thread transport** | Large artifact channel — keeps diffs, logs, and file content out of prompt context |
 
@@ -214,6 +214,7 @@ agent-mux install --config=false
 | `agent-mux attach [session]` | Attach or switch to an existing session; default: `agent` |
 | `agent-mux open [session]` | Alias for `attach`; does not create sessions |
 | `agent-mux uninstall` | Remove `~/.agent-mux/`, restore previous tmux config file or symlink from backup when available. Note: does not remove the `PATH` line added to your shell rc file. |
+| `agent-mux keys` | Print the keyboard shortcuts for the agent-mux tmux config (alias: `agent-mux controls`) |
 | `agent-mux version` | Print version |
 | `agent-mux --help` | Show the agent-mux CLI reference, including the tmux-agent command summary |
 
@@ -230,7 +231,7 @@ agent-mux install --config=false
 
 ## Controls
 
-> Requires the agent-mux tmux config, installed by default. All shortcuts use **Alt** on Linux/Win-WSL2, **Option** on macOS — no prefix key.
+> Requires the agent-mux tmux config, installed by default. All shortcuts use **Alt** on Linux/Win-WSL2, **Option** on macOS — no prefix key. Run `agent-mux keys` to print this table from the terminal.
 
 ### Status Bar
 
