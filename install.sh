@@ -2,7 +2,7 @@
 # agent-mux — one-command tmux setup
 set -euo pipefail
 
-VERSION="1.11.1"
+VERSION="1.12.0"
 REPO="maxto/agent-mux"
 BRANCH="v${VERSION}"
 BASE_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
@@ -864,6 +864,7 @@ tmux-agent — cross-pane communication:
   tmux-agent task <target> <text>          Send task with reply/protocol instructions
   tmux-agent message <target> <text>       Type text with sender header (no Enter; agent-to-agent)
   tmux-agent keys <target> <key>...        Send special keys (Enter, Escape, C-c, Tab, etc.)
+  tmux-agent kill <target>                 Kill a pane (requires a prior read; respects pause)
   tmux-agent name <target> <label>         Label a pane (shown in tmux border)
   tmux-agent resolve <label>               Print pane target for a label
   tmux-agent id                            Print this pane's ID ($TMUX_PANE)

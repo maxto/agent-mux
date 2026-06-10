@@ -3,7 +3,7 @@
 # Any tool that can run bash can use this to talk to other panes.
 set -euo pipefail
 
-VERSION="1.11.1"
+VERSION="1.12.0"
 
 # --- Helpers ---
 
@@ -349,6 +349,7 @@ Commands:
   message <target> <text>   Type text with auto-prepended sender info and reply target
   read <target> [lines]     Read last N lines from pane (default: 50)
   keys <target> <key>...    Send special keys (Enter, Escape, C-c, etc.)
+  kill <target>             Kill a pane (requires a prior read; respects pause)
   name <target> <label>     Label a pane (visible in tmux border)
   resolve <label>           Print pane target for a label
   id                        Print this pane's ID ($TMUX_PANE)
@@ -373,7 +374,7 @@ Replies:
   Reply rules, header format, and thread pings: run 'tmux-agent protocol'.
 
 Read guard:
-  'type' and 'keys' require a prior 'read' of the same target; every send
+  'type', 'keys', and 'kill' require a prior 'read' of the same target; every send
   clears the mark, so re-read before the next manual interaction. 'send' and
   'task' run the full read -> message -> read -> Enter cycle for you.
 
@@ -816,6 +817,25 @@ cmd_keys() {
     tmx send-keys -t "$target" "$key"
   done
   clear_read "$target"
+}
+
+# Destructive: requires a prior read (look before you kill) and respects the
+# pause kill switch. Resolves labels and tmux-native targets like other commands.
+cmd_kill() {
+  require_args 1 $# "kill"
+  require_tmux
+  check_paused
+  local target
+  target=$(resolve_target "$1")
+  validate_target "$target"
+  require_read "$target"
+
+  local pane_id
+  pane_id=$(tmx display-message -t "$target" -p '#{pane_id}' 2>/dev/null || printf '%s' "$target")
+  tmx kill-pane -t "$target"
+  clear_read "$target"
+  _audit_event kill "${TMUX_PANE:-unknown}" "$pane_id" 0 "" "" ok
+  echo "killed pane: $pane_id"
 }
 
 cmd_name() {
@@ -1289,7 +1309,7 @@ case "$1" in
   resume)    shift; cmd_resume "$@"; exit ;;
   status)    shift; cmd_status "$@"; exit ;;
   audit)     shift; cmd_audit  "$@"; exit ;;
-  list|type|send|task|message|msg|read|keys|name|resolve|doctor) ;;
+  list|type|send|task|message|msg|read|keys|kill|name|resolve|doctor) ;;
   *)         die "unknown command: $1. Run 'tmux-agent --help' for usage." ;;
 esac
 
@@ -1305,6 +1325,7 @@ case "$1" in
   message|msg) shift; cmd_message "$@" ;;
   read)    shift; cmd_read "$@" ;;
   keys)    shift; cmd_keys "$@" ;;
+  kill)    shift; cmd_kill "$@" ;;
   name)    shift; cmd_name "$@" ;;
   resolve) shift; cmd_resolve "$@" ;;
   doctor)  shift; cmd_doctor "$@" ;;
