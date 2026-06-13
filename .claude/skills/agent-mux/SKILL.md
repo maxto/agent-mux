@@ -46,6 +46,32 @@ Task: ...
 Expected reply: files changed, tests run, risks
 ```
 
+## Pull mode for bare-CLI workers (`task --await` + `await`)
+
+Codex, Gemini, DeepSeek, and small local models usually do not know the
+protocol and won't run `tmux-agent send` to reply. For these, **pull instead of
+push**: you delegate, the worker just prints its answer, and you collect it when
+you're ready. Nothing is ever typed into your pane, so there is no race with
+your own turn.
+
+```bash
+tmux-agent task --await %4 'review scripts/tmux-agent and list risks'
+tmux-agent task --await %5 'check the install.sh OS detection'
+tmux-agent await %4 %5            # blocks until both print their done marker
+```
+
+- `task --await` appends a footer asking the worker to wrap its answer between
+  two marker lines (`<<<label@%N reply NONCE>>>` … `<<<…done NONCE>>>`) and
+  records the expected marker in a state file. The worker needs no protocol
+  knowledge — it just prints.
+- `await <target>...` blocks until **every** target prints its done marker or
+  hits the timeout (default 300s, `--timeout N` or `TMUX_AGENT_AWAIT_TIMEOUT`),
+  then prints one delimited block per target — only the answers, token-minimal.
+- A timed-out target shows `=== TIMEOUT … ===` plus its last pane lines; the
+  others still return their answers.
+- Use the existing push (`send`/`task` + reply) only for agents that already
+  speak the protocol (e.g. another Claude). The two paths coexist.
+
 ## Session and pane management
 
 Use `agent-mux` for user-facing session/window work; `tmux-agent` does not

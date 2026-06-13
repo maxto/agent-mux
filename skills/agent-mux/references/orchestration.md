@@ -122,3 +122,19 @@ Send it with:
 ```bash
 tmux-agent send --path qa handoff.md
 ```
+
+## Pull delegation for heterogeneous workers
+
+When a pane runs a bare CLI agent (Codex, Gemini, DeepSeek, a local model) that
+does not speak the tmux-agent protocol, do not expect it to reply with
+`tmux-agent send`. Delegate in pull mode and fan in:
+
+```bash
+tmux-agent task --await backend  'implement X; report files changed and risks'
+tmux-agent task --await qa       'run the suite; report failures'
+tmux-agent await backend qa --timeout 600
+```
+
+`await` returns one delimited block per worker once each has printed its done
+marker (or timed out). This keeps the round-trip to a single ingestion and never
+injects text into the orchestrator's pane.
