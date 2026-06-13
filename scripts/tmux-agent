@@ -903,6 +903,105 @@ cmd_keys() {
   clear_read "$target"
 }
 
+# Default seconds await waits for each target to reach a terminal state.
+await_timeout() {
+  local raw="${TMUX_AGENT_AWAIT_TIMEOUT-300}"
+  if [[ ! "$raw" =~ ^[0-9]+$ ]]; then
+    die "TMUX_AGENT_AWAIT_TIMEOUT must be a non-negative integer, got: ${raw:-<empty>}"
+  fi
+  echo "$raw"
+}
+
+# Extract the text of the LAST reply..done block from stdin. Markers must be on
+# their own line; the prose footer echo never forms a valid block.
+await_extract() {
+  local reply_marker="$1" done_marker="$2"
+  awk -v r="$reply_marker" -v d="$done_marker" '
+    $0 == r { capturing=1; buf=""; next }
+    $0 == d { if (capturing) { out=buf; capturing=0 } next }
+    capturing { buf = buf $0 "\n" }
+    END { printf "%s", out }
+  '
+}
+
+# Block until each target prints its done marker (or the timeout elapses), then
+# print one delimited block per target. Pull delivery: nothing is injected into
+# the caller's pane, so there is no race with the caller's own state.
+cmd_await() {
+  require_tmux
+  require_args 1 $# "await"
+  local timeout
+  timeout=$(await_timeout)
+
+  local -a targets=()
+  while (( $# )); do
+    case "$1" in
+      --timeout)
+        shift
+        [[ $# -ge 1 ]] || die "await --timeout requires a value"
+        [[ "$1" =~ ^[0-9]+$ ]] || die "await --timeout must be a non-negative integer"
+        timeout="$1"; shift ;;
+      *)
+        targets+=("$1"); shift ;;
+    esac
+  done
+  (( ${#targets[@]} )) || die "await requires at least one target"
+
+  local -a pane_ids=() reply_markers=() done_markers=() labels=()
+  local t resolved pane_id state label nonce markers _pid
+  for t in "${targets[@]}"; do
+    resolved=$(resolve_target "$t")
+    validate_target "$resolved"
+    pane_id=$(pane_id_of "$resolved")
+    state="$(await_state_path "$pane_id")"
+    [[ -f "$state" ]] || die "no pending await for $t; run 'tmux-agent task --await $t ...' first"
+    IFS='|' read -r _pid nonce label < "$state" || true
+    markers=$(await_markers "$pane_id" "$label" "$nonce")
+    pane_ids+=("$pane_id")
+    reply_markers+=("${markers%%$'\t'*}")
+    done_markers+=("${markers#*$'\t'}")
+    labels+=("$label")
+  done
+
+  local n="${#pane_ids[@]}"
+  local -a results=() finished=()
+  local i
+  for (( i=0; i<n; i++ )); do results[i]=""; finished[i]=0; done
+
+  local deadline
+  deadline=$(( $(date +%s) + timeout ))
+  while true; do
+    local all_done=1 capture
+    for (( i=0; i<n; i++ )); do
+      (( finished[i] )) && continue
+      capture=$(tmx capture-pane -t "${pane_ids[i]}" -p -J -S - 2>/dev/null || true)
+      if grep -qxF "${done_markers[i]}" <<<"$capture"; then
+        results[i]=$(printf '%s\n' "$capture" | await_extract "${reply_markers[i]}" "${done_markers[i]}")
+        finished[i]=1
+      else
+        all_done=0
+      fi
+    done
+    (( all_done )) && break
+    (( $(date +%s) >= deadline )) && break
+    sleep 0.5
+  done
+
+  local out="" tag
+  for (( i=0; i<n; i++ )); do
+    if [[ -n "${labels[i]}" ]]; then tag="${pane_ids[i]} (${labels[i]})"; else tag="${pane_ids[i]}"; fi
+    if (( finished[i] )); then
+      out+="=== reply ${tag} ==="$'\n'
+      out+="${results[i]}"$'\n'
+    else
+      out+="=== TIMEOUT ${tag} — no marker after ${timeout}s ==="$'\n'
+      out+="$(tmx capture-pane -t "${pane_ids[i]}" -p -J -S -10 2>/dev/null || true)"$'\n'
+    fi
+    rm -f "$(await_state_path "${pane_ids[i]}")"
+  done
+  printf '%s' "$out"
+}
+
 # Destructive: requires a prior read (look before you kill) and respects the
 # pause kill switch. Resolves labels and tmux-native targets like other commands.
 cmd_kill() {
@@ -1393,7 +1492,7 @@ case "$1" in
   resume)    shift; cmd_resume "$@"; exit ;;
   status)    shift; cmd_status "$@"; exit ;;
   audit)     shift; cmd_audit  "$@"; exit ;;
-  list|type|send|task|message|msg|read|keys|kill|name|resolve|doctor) ;;
+  list|type|send|task|message|msg|read|keys|kill|name|resolve|doctor|await) ;;
   *)         die "unknown command: $1. Run 'tmux-agent --help' for usage." ;;
 esac
 
@@ -1409,6 +1508,7 @@ case "$1" in
   message|msg) shift; cmd_message "$@" ;;
   read)    shift; cmd_read "$@" ;;
   keys)    shift; cmd_keys "$@" ;;
+  await)   shift; cmd_await "$@" ;;
   kill)    shift; cmd_kill "$@" ;;
   name)    shift; cmd_name "$@" ;;
   resolve) shift; cmd_resolve "$@" ;;

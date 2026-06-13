@@ -80,3 +80,49 @@ state_path() {
   [[ "$output" == *"thread: "* ]]
   [ -f "$(state_path "$TARGET_PANE")" ]
 }
+
+# Simulate a worker reply by printing the reply/done block into the pane.
+# Reads the nonce/label that task --await recorded, builds the markers, and
+# emits them on their own lines via printf in the target shell.
+emit_reply() {
+  local pane="$1" answer="$2" state pane_id label nonce tag reply done
+  state="$(state_path "$pane")"
+  IFS='|' read -r pane_id nonce label < "$state" || true
+  if [ -n "$label" ]; then tag="${label}@${pane_id}"; else tag="${pane_id}"; fi
+  reply="<<<${tag} reply ${nonce}>>>"
+  done="<<<${tag} done ${nonce}>>>"
+  tmux -S "$SOCKET" send-keys -t "$pane" -l \
+    "printf '%s\\n' '${reply}' '${answer}' '${done}'"
+  tmux -S "$SOCKET" send-keys -t "$pane" Enter
+}
+
+@test "await returns the worker reply block and clears the state file" {
+  bash "$TMUX_AGENT" task --await "$TARGET_PANE" "compute 2+2" >/dev/null
+  emit_reply "$TARGET_PANE" "ANSWER-4"
+  run bash "$TMUX_AGENT" await "$TARGET_PANE" --timeout 5
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"=== reply ${TARGET_PANE} ==="* ]]
+  [[ "$output" == *"ANSWER-4"* ]]
+  [ ! -f "$(state_path "$TARGET_PANE")" ]
+}
+
+@test "await ignores the prose footer echo (no premature match)" {
+  # task --await typed the footer (which contains the markers in prose) but the
+  # worker has not produced its standalone block, so await must time out.
+  bash "$TMUX_AGENT" task --await "$TARGET_PANE" "no answer yet" >/dev/null
+  run bash "$TMUX_AGENT" await "$TARGET_PANE" --timeout 2
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"=== TIMEOUT ${TARGET_PANE}"* ]]
+  [ ! -f "$(state_path "$TARGET_PANE")" ]
+}
+
+@test "await without a pending task fails clearly" {
+  run bash "$TMUX_AGENT" await "$TARGET_PANE"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"no pending await"* ]]
+}
+
+@test "await requires at least one target" {
+  run bash "$TMUX_AGENT" await
+  [ "$status" -ne 0 ]
+}
