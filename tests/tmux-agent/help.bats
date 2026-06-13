@@ -43,3 +43,18 @@ TMUX_AGENT="$BATS_TEST_DIRNAME/../../scripts/tmux-agent"
   [[ "$output" == *"tmux-agent task"* ]]
   [[ "$output" == *"Do not wait"* ]]
 }
+
+@test "help documents task --await and await" {
+  run bash "$TMUX_AGENT" --help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"task --await"* ]]
+  [[ "$output" == *"await <target>"* ]]
+  [[ "$output" == *"TMUX_AGENT_AWAIT_TIMEOUT"* ]]
+}
+
+@test "protocol explains pull mode" {
+  run bash "$TMUX_AGENT" protocol
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Pull mode"* ]]
+  [[ "$output" == *"task --await"* ]]
+}

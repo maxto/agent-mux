@@ -374,6 +374,8 @@ Commands:
   type <target> <text>      Type text without pressing Enter
   send <target> <text>      Read, send message, verify, and press Enter (full cycle)
   task <target> <text>      Send a task with reply/protocol instructions appended
+  task --await <target> <text>   Delegate in pull mode; collect the reply with 'await'
+  await <target>... [--timeout N]  Block until each target prints its done marker (pull)
   message <target> <text>   Type text with auto-prepended sender info and reply target
   read <target> [lines]     Read last N lines from pane (default: 50)
   keys <target> <key>...    Send special keys (Enter, Escape, C-c, etc.)
@@ -416,6 +418,7 @@ Environment:
   TMUX_AGENT_INLINE_THRESHOLD  Max bytes for inline send before auto-spill to file transport (default: 2048; 0 = always file)
   TMUX_AGENT_SEND_SETTLE       Seconds to wait around Enter so receiver TUIs accept it (default: 0.4; 0 = no wait)
   TMUX_AGENT_SEND_VERIFY       Verify submission and retry Enter once if needed (default: 1; 0 = off)
+  TMUX_AGENT_AWAIT_TIMEOUT     Seconds 'await' waits per target before timing out (default: 300)
 EOF
   exit 0
 }
@@ -489,6 +492,16 @@ cmd_protocol() {
   echo "tmux-agent protocol v1"
   echo
   _protocol_rules "%1"
+  cat <<'EOF'
+
+Pull mode (workers that don't speak this protocol):
+  Delegate with: tmux-agent task --await <target> 'task text'
+  The worker just prints its answer wrapped in two marker lines; it does not
+  run any tmux-agent command. Collect replies with:
+    tmux-agent await <target>... [--timeout N]
+  await blocks until each target prints its done marker (or times out) and
+  prints one delimited block per target.
+EOF
   cat <<'EOF'
 
 Header fields:
