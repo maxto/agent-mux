@@ -99,6 +99,23 @@ emit_reply() {
   tmux -S "$SOCKET" send-keys -t "$pane" Enter
 }
 
+# Like emit_reply, but decorates each marker line the way a TUI agent renders
+# its output: an arbitrary prefix (leading spaces, a bullet glyph) before the
+# marker. reply_prefix/done_prefix default to a two-space indent.
+emit_reply_prefixed() {
+  local pane="$1" answer="$2" reply_prefix="${3:-  }" done_prefix="${4:-  }"
+  local state pane_id label nonce tag reply done escaped_answer
+  state="$(state_path "$pane")"
+  IFS='|' read -r pane_id nonce label < "$state" || true
+  if [ -n "$label" ]; then tag="${label}@${pane_id}"; else tag="${pane_id}"; fi
+  reply="${reply_prefix}<<<${tag} reply ${nonce}>>>"
+  done="${done_prefix}<<<${tag} done ${nonce}>>>"
+  printf -v escaped_answer '%q' "$answer"
+  tmux -S "$SOCKET" send-keys -t "$pane" -l \
+    "printf '%s\\n' '${reply}' ${escaped_answer} '${done}'"
+  tmux -S "$SOCKET" send-keys -t "$pane" Enter
+}
+
 @test "await returns the worker reply block and clears the state file" {
   bash "$TMUX_AGENT" task --await "$TARGET_PANE" "compute 2+2" >/dev/null
   emit_reply "$TARGET_PANE" "ANSWER-4"
@@ -117,6 +134,39 @@ emit_reply() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"=== TIMEOUT ${TARGET_PANE}"* ]]
   [ ! -f "$(state_path "$TARGET_PANE")" ]
+}
+
+@test "await detects markers indented by a TUI (leading whitespace)" {
+  # Gemini and similar TUIs indent the agent's output, so the marker is never
+  # alone on a full line. await must still detect and extract it.
+  bash "$TMUX_AGENT" task --await "$TARGET_PANE" "indented worker" >/dev/null
+  emit_reply_prefixed "$TARGET_PANE" "INDENTED-OK" "  " "  "
+  run bash "$TMUX_AGENT" await "$TARGET_PANE" --timeout 5
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"=== reply ${TARGET_PANE} ==="* ]]
+  [[ "$output" == *"INDENTED-OK"* ]]
+  [ ! -f "$(state_path "$TARGET_PANE")" ]
+}
+
+@test "await detects markers behind a TUI bullet glyph" {
+  # Codex prefixes the reply marker with a bullet (• ) and indents the done
+  # marker. Both must still be recognized.
+  bash "$TMUX_AGENT" task --await "$TARGET_PANE" "bulleted worker" >/dev/null
+  emit_reply_prefixed "$TARGET_PANE" "BULLET-OK" "• " "  "
+  run bash "$TMUX_AGENT" await "$TARGET_PANE" --timeout 5
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"=== reply ${TARGET_PANE} ==="* ]]
+  [[ "$output" == *"BULLET-OK"* ]]
+  [ ! -f "$(state_path "$TARGET_PANE")" ]
+}
+
+@test "await still ignores the prose footer echo when decorations are allowed" {
+  # The footer line 'End your answer ... only: <<<...done...>>>' ends with the
+  # marker but has words before it, so tolerant matching must not fire on it.
+  bash "$TMUX_AGENT" task --await "$TARGET_PANE" "no answer yet" >/dev/null
+  run bash "$TMUX_AGENT" await "$TARGET_PANE" --timeout 2
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"=== TIMEOUT ${TARGET_PANE}"* ]]
 }
 
 @test "await without a pending task fails clearly" {

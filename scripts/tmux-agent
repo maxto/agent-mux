@@ -3,7 +3,7 @@
 # Any tool that can run bash can use this to talk to other panes.
 set -euo pipefail
 
-VERSION="1.13.0"
+VERSION="1.13.1"
 
 # --- Helpers ---
 
@@ -925,14 +925,42 @@ await_timeout() {
   echo "$raw"
 }
 
-# Extract the text of the LAST reply..done block from stdin. Markers must be on
-# their own line; the prose footer echo never forms a valid block. Called only
-# after the done marker matched, so an absent reply marker yields empty output.
+# True when a captured line "carries" a marker: the marker sits at the end of
+# the line and only whitespace or non-alphanumeric decoration precedes it. This
+# tolerates how TUI agents (codex, gemini, …) render the marker — indented or
+# behind a bullet glyph — while still rejecting the prose footer echo
+# (`End your answer … only: <<<…>>>`), whose prefix contains words. Uses literal
+# index()/substr() so marker metacharacters and multibyte bullets are safe on
+# any awk.
+await_line_carries() {
+  awk -v m="$1" '
+    {
+      idx = index($0, m)
+      if (idx == 0) next
+      if (substr($0, idx + length(m)) ~ /[^ \t]/) next
+      if (substr($0, 1, idx - 1) ~ /[[:alnum:]]/) next
+      found = 1
+    }
+    END { exit found ? 0 : 1 }
+  '
+}
+
+# Extract the text of the LAST reply..done block from stdin. Marker lines may be
+# indented or bullet-decorated by a TUI (same tolerance as await_line_carries);
+# the prose footer echo never forms a valid block. Called only after the done
+# marker matched, so an absent reply marker yields empty output.
 await_extract() {
   local reply_marker="$1" done_marker="$2"
   awk -v r="$reply_marker" -v d="$done_marker" '
-    $0 == r { capturing=1; buf=""; next }
-    $0 == d { if (capturing) { out=buf; capturing=0 } next }
+    function carries(line, mk,   idx) {
+      idx = index(line, mk)
+      if (idx == 0) return 0
+      if (substr(line, idx + length(mk)) ~ /[^ \t]/) return 0
+      if (substr(line, 1, idx - 1) ~ /[[:alnum:]]/) return 0
+      return 1
+    }
+    carries($0, r) { capturing=1; buf=""; next }
+    carries($0, d) { if (capturing) { out=buf; capturing=0 } next }
     capturing { buf = buf $0 "\n" }
     END { printf "%s", out }
   '
@@ -989,7 +1017,7 @@ cmd_await() {
     for (( i=0; i<n; i++ )); do
       (( finished[i] )) && continue
       capture=$(tmx capture-pane -t "${pane_ids[i]}" -p -J -S - 2>/dev/null || true)
-      if grep -qxF "${done_markers[i]}" <<<"$capture"; then
+      if await_line_carries "${done_markers[i]}" <<<"$capture"; then
         results[i]=$(printf '%s\n' "$capture" | await_extract "${reply_markers[i]}" "${done_markers[i]}")
         finished[i]=1
       else
