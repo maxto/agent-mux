@@ -913,7 +913,8 @@ await_timeout() {
 }
 
 # Extract the text of the LAST reply..done block from stdin. Markers must be on
-# their own line; the prose footer echo never forms a valid block.
+# their own line; the prose footer echo never forms a valid block. Called only
+# after the done marker matched, so an absent reply marker yields empty output.
 await_extract() {
   local reply_marker="$1" done_marker="$2"
   awk -v r="$reply_marker" -v d="$done_marker" '
@@ -948,14 +949,14 @@ cmd_await() {
   (( ${#targets[@]} )) || die "await requires at least one target"
 
   local -a pane_ids=() reply_markers=() done_markers=() labels=()
-  local t resolved pane_id state label nonce markers _pid
+  local t resolved pane_id state label nonce markers _pane_id
   for t in "${targets[@]}"; do
     resolved=$(resolve_target "$t")
     validate_target "$resolved"
     pane_id=$(pane_id_of "$resolved")
     state="$(await_state_path "$pane_id")"
     [[ -f "$state" ]] || die "no pending await for $t; run 'tmux-agent task --await $t ...' first"
-    IFS='|' read -r _pid nonce label < "$state" || true
+    IFS='|' read -r _pane_id nonce label < "$state" || true
     markers=$(await_markers "$pane_id" "$label" "$nonce")
     pane_ids+=("$pane_id")
     reply_markers+=("${markers%%$'\t'*}")

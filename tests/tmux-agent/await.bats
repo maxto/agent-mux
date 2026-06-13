@@ -85,14 +85,17 @@ state_path() {
 # Reads the nonce/label that task --await recorded, builds the markers, and
 # emits them on their own lines via printf in the target shell.
 emit_reply() {
-  local pane="$1" answer="$2" state pane_id label nonce tag reply done
+  local pane="$1" answer="$2" state pane_id label nonce tag reply done escaped_answer
   state="$(state_path "$pane")"
   IFS='|' read -r pane_id nonce label < "$state" || true
   if [ -n "$label" ]; then tag="${label}@${pane_id}"; else tag="${pane_id}"; fi
   reply="<<<${tag} reply ${nonce}>>>"
   done="<<<${tag} done ${nonce}>>>"
+  # Quote-safe: the answer is free-form, so escape it rather than embed raw in
+  # the single-quoted printf the target shell will run.
+  printf -v escaped_answer '%q' "$answer"
   tmux -S "$SOCKET" send-keys -t "$pane" -l \
-    "printf '%s\\n' '${reply}' '${answer}' '${done}'"
+    "printf '%s\\n' '${reply}' ${escaped_answer} '${done}'"
   tmux -S "$SOCKET" send-keys -t "$pane" Enter
 }
 
