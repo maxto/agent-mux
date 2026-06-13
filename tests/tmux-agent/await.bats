@@ -129,3 +129,41 @@ emit_reply() {
   run bash "$TMUX_AGENT" await
   [ "$status" -ne 0 ]
 }
+
+@test "await fans in over multiple targets: one reply, one timeout" {
+  tmux -S "$SOCKET" split-window -h -t await_test
+  PANES2=( $(tmux -S "$SOCKET" list-panes -t await_test -F '#{pane_id}') )
+  SECOND_TARGET="${PANES2[2]}"
+
+  bash "$TMUX_AGENT" task --await "$TARGET_PANE" "fast worker" >/dev/null
+  bash "$TMUX_AGENT" task --await "$SECOND_TARGET" "slow worker" >/dev/null
+
+  # Only the first target produces its block.
+  emit_reply "$TARGET_PANE" "FAST-DONE"
+
+  run bash "$TMUX_AGENT" await "$TARGET_PANE" "$SECOND_TARGET" --timeout 3
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"=== reply ${TARGET_PANE} ==="* ]]
+  [[ "$output" == *"FAST-DONE"* ]]
+  [[ "$output" == *"=== TIMEOUT ${SECOND_TARGET}"* ]]
+
+  # Both state files are cleared regardless of outcome.
+  [ ! -f "$(state_path "$TARGET_PANE")" ]
+  [ ! -f "$(state_path "$SECOND_TARGET")" ]
+}
+
+@test "await respects a label in the delimiter and output header" {
+  bash "$TMUX_AGENT" name "$TARGET_PANE" worker1
+  bash "$TMUX_AGENT" task --await worker1 "labelled task" >/dev/null
+
+  # State file records the label last (pane_id|nonce|label); markers use worker1@%N.
+  state="$(state_path "$TARGET_PANE")"
+  content="$(cat "$state")"
+  [[ "$content" == "${TARGET_PANE}|"*"|worker1" ]]
+
+  emit_reply "$TARGET_PANE" "LABELLED-OK"
+  run bash "$TMUX_AGENT" await worker1 --timeout 5
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"=== reply ${TARGET_PANE} (worker1) ==="* ]]
+  [[ "$output" == *"LABELLED-OK"* ]]
+}
