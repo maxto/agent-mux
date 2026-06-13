@@ -766,6 +766,8 @@ cmd_task() {
   local text="$*"
 
   if (( await_mode )); then
+    # Early guard: reject reserved headers before recording state, and cover the
+    # thread-spill path too (the non-await path relies on cmd_send's own check).
     check_header_injection "$text"
     local resolved pane_id label nonce markers reply_marker done_marker
     resolved=$(resolve_target "$target")
@@ -779,7 +781,6 @@ cmd_task() {
     local footer full_text
     footer=$(printf '\n\n%s' "$(_await_footer "$reply_marker" "$done_marker")")
     full_text="${text}${footer}"
-    printf '%s|%s|%s' "$pane_id" "$label" "$nonce" > "$(await_state_path "$pane_id")"
     local threshold byte_len
     threshold=$(inline_threshold)
     byte_len=$(printf '%s' "$full_text" | wc -c)
@@ -788,6 +789,10 @@ cmd_task() {
     else
       cmd_send "$resolved" "$full_text"
     fi
+    # Record the expected sentinel only after a successful send, so a delivery
+    # failure can't orphan a state file that await would later wait on.
+    # Format: pane_id|nonce|label (label last; it is the only free-form field).
+    printf '%s|%s|%s' "$pane_id" "$nonce" "$label" > "$(await_state_path "$pane_id")"
     return
   fi
 
