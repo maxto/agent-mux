@@ -19,13 +19,14 @@ Without it:
 - copy-paste between terminal windows to hand off diffs, logs, or prompts
 - large payloads bloat the receiver's prompt context immediately
 - no shared routing — agents can't address or reply to each other
+- bare-CLI workers (Codex, Gemini, local models) can't reliably reply — they don't speak any reply protocol, and a reply typed back while the orchestrator is busy can be lost
 - each agent works in isolation with no awareness of what others are doing
 
 With agent-mux:
 
 - agents send messages across panes with `tmux-agent send` — no copy-paste
 - large handoffs stay on disk via thread transport; the receiver loads them only when needed
-- replies route back to the sender automatically via pane ID
+- protocol-aware agents reply straight back to the sender via pane ID; bare-CLI workers are handled by **pull mode** — they just print their answer and the orchestrator collects it with `await` when ready, with no protocol knowledge and no race
 - Claude Code orchestrates (the `/agent-mux` skill auto-loads there); other agents (Codex, Gemini, DeepSeek, local models…) participate as workers
 
 Large handoffs between agents no longer inflate the prompt. When a payload exceeds the inline threshold (default 2KB), `tmux-agent send` automatically switches to thread transport: the receiver sees only a compact ping, and the full content stays on disk until they explicitly call `tmux-agent thread read`. The threshold is configurable via `TMUX_AGENT_INLINE_THRESHOLD` — set it to `0` to always use file transport regardless of size.
