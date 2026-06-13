@@ -106,6 +106,17 @@ tmux-agent task codex "Review this branch for regressions. Focus on tests and ed
 tmux-agent task gemini "Review this branch independently. Focus on design and simplification."
 ```
 
+When the workers are bare CLIs that don't speak the protocol (Codex, Gemini,
+DeepSeek, local models), use **pull mode** instead: delegate with `--await`, then
+collect both replies in one blocking call — no worker needs to run `tmux-agent`,
+and nothing is typed back into your pane.
+
+```bash
+tmux-agent task --await codex "Review this branch for regressions."
+tmux-agent task --await gemini "Review this branch independently."
+tmux-agent await codex gemini            # blocks until both finish, then prints both replies
+```
+
 ### Large Handoffs
 
 For diffs, logs, summaries, or review packets, prefer thread transport. The
@@ -141,6 +152,7 @@ agent-mux does not provide long-term memory or automatic RAG. The durable state 
 
 - reply to `[tmux-agent v1 ... reply=<pane>]` messages with `tmux-agent send <pane> ...`
 - use `tmux-agent task` for skill-unaware agents and `tmux-agent send` for normal handoffs
+- for bare-CLI workers, prefer pull mode: `tmux-agent task --await <pane>` then collect with `tmux-agent await`
 - include worker ownership, review, testing, and follow-up in multi-agent plans
 - summarize delegated work before finalizing
 
@@ -314,6 +326,33 @@ tmux-agent task codex "Review the installer changes. Reply with risks and tests.
 The read guard (you must `read` a pane before `type`/`keys`) and the message
 header convention are documented in `tmux-agent --help` and `tmux-agent protocol`.
 
+### Pull mode (`task --await` + `await`)
+
+Push delivery (`send`/`task` + reply) needs the worker to run `tmux-agent` to
+answer, and to do so while your pane is idle. Bare-CLI workers (Codex, Gemini,
+DeepSeek, local models) often can't, and a reply typed back while you're busy can
+race your turn. Pull mode removes both problems: **the worker just prints its
+answer; you pull it when you're ready.**
+
+```bash
+tmux-agent task --await codex "Audit scripts/tmux-agent and list risks."
+tmux-agent task --await %5    "Check install.sh OS detection."
+tmux-agent await codex %5 --timeout 600
+```
+
+- `task --await` appends a footer asking the worker to wrap its answer between two
+  marker lines (`<<<label@%N reply NONCE>>>` … `<<<…done NONCE>>>`) and records
+  the expected marker in a state file. The worker needs no protocol knowledge.
+- `await <target>...` blocks until **every** target prints its done marker or hits
+  the timeout (default 300s, `--timeout N` or `TMUX_AGENT_AWAIT_TIMEOUT`), then
+  prints one delimited block per target — only the answers, so a fan-out collapses
+  to a single ingestion. Nothing is injected into your pane.
+- A timed-out target shows `=== TIMEOUT … ===` with its last pane lines; the rest
+  still return their answers.
+
+Pull mode coexists with push — keep `send`/`task` + reply for agents that already
+speak the protocol (e.g. another Claude).
+
 ### Thread transport (large payloads)
 
 For payloads over 2KB, `send` automatically switches to file-based transport. The pane receives only a compact ping; the message lives on the filesystem. Prompt growth stays flat regardless of payload size until the receiver explicitly reads the thread.
@@ -421,6 +460,7 @@ renaming the current window changes `0:agents` to something like `0:work`.
 | `TMUX_AGENT_THREAD_DIR` | Override thread storage path (default: `${XDG_RUNTIME_DIR:-/tmp/agent-mux-<uid>}/threads`). Useful for persistent, shared, or sandbox-specific thread stores. |
 | `TMUX_AGENT_CURSOR_DIR` | Override cursor storage path (default: `/tmp/agent-mux-<uid>/cursors`). Set this in sandboxed environments where `XDG_RUNTIME_DIR` is read-only. |
 | `TMUX_AGENT_INLINE_THRESHOLD` | Max bytes for inline `send` before auto-spill to file transport (default: `2048`; `0` = always use file transport) |
+| `TMUX_AGENT_AWAIT_TIMEOUT` | Seconds `await` waits per target before timing out (default: `300`) |
 
 ### Useful low-level tmux commands
 
