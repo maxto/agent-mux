@@ -74,14 +74,26 @@ tmux-agent await %4 %5            # blocks until both print their done marker
 
 ## Session and pane management
 
-Use `agent-mux` for user-facing session/window work; `tmux-agent` does not
-create sessions or split panes:
+Use `agent-mux` for user-facing session/window work. `tmux-agent` does not
+create sessions, but it **does** open worker panes in the current window
+with `split` (it prints the new pane-id):
 
 ```bash
 agent-mux session start --name agents --labels planner,frontend,backend,qa
 agent-mux attach agents
 tmux-agent name "$(tmux-agent id)" planner
 tmux-agent list
+```
+
+Add a worker pane to the current window and bring it up in the
+coordination layer — no raw tmux needed:
+
+```bash
+NEW=$(tmux-agent split)            # create pane, prints %id
+tmux-agent name "$NEW" worker      # label it
+tmux-agent read "$NEW"             # read-guard
+tmux-agent type "$NEW" "python worker.py"
+tmux-agent keys "$NEW" Enter       # launch
 ```
 
 ## Typing commands into a pane

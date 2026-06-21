@@ -88,6 +88,15 @@ The core safety mechanism: an agent must call `read` before `type` or `keys`. A 
 
 Pane targets accept: tmux natives (`%3`, `session:window.pane`, window index `0`), or custom labels set via `tmux-agent name <target> <label>`. Labels are stored in the `@name` pane option and resolved at runtime.
 
+### Pane creation (`split`)
+
+`tmux-agent split` is the only sanctioned way to add a pane to a live
+window. It wraps `tmux split-window … -PF '#{pane_id}'` (the same primitive
+`agent-mux session start` uses internally) and prints the new pane-id. It
+does not label or launch anything — compose with `name` and
+`read`/`type`/`keys`. `agent-mux session start` still never splits the
+current window; it only creates new detached sessions.
+
 ### Message convention
 
 `tmux-agent message` auto-prepends a header:
