@@ -1108,8 +1108,9 @@ cmd_split() {
     split_target="$TMUX_PANE"
   fi
 
-  local args=("$direction" "-t" "$split_target" "-PF" '#{pane_id}')
+  local args=("$direction" "-t" "$split_target")
   [[ -n "$cwd" ]] && args+=("-c" "$cwd")
+  args+=("-PF" '#{pane_id}')
   tmx split-window "${args[@]}"
 }
 

@@ -70,6 +70,14 @@ win0_pane_count() {
   [ "$(win0_pane_count)" -eq 1 ]
 }
 
+@test "split -v -h applies the last direction flag (-h)" {
+  run bash "$TMUX_AGENT" split -v -h
+  [ "$status" -eq 0 ]
+  new_pane="$output"
+  pane_left=$(tmux -S "$SOCKET" display-message -t "$new_pane" -p '#{pane_left}')
+  [ "$pane_left" -gt 0 ]
+}
+
 @test "split outside tmux without --target errors" {
   unset TMUX_PANE
   run bash "$TMUX_AGENT" split
