@@ -86,16 +86,27 @@ See [`examples/hello-agents/`](examples/hello-agents/) for the full walkthrough.
 
 ### Coordinator, Implementer, Reviewer
 
-Use one pane as coordinator, one as implementer, and one as reviewer. Name panes
-early so instructions stay readable:
+Use one pane as coordinator, then add worker panes to the current window with
+`tmux-agent split` (it prints each new pane-id). Name panes early so instructions
+stay readable:
 
 ```bash
-tmux-agent name %1 coordinator
-tmux-agent name %2 implementer
-tmux-agent name %3 reviewer
+tmux-agent name "$(tmux-agent id)" coordinator   # this pane
+
+# Add two worker panes to the current window — split prints the new pane-id
+implementer=$(tmux-agent split)
+reviewer=$(tmux-agent split)
+tmux-agent name "$implementer" implementer
+tmux-agent name "$reviewer" reviewer
+
 tmux-agent send implementer "Implement the failing test fix. Report files changed and tests run."
 tmux-agent send reviewer "Review the implementation after the implementer replies."
 ```
+
+`tmux-agent split [--cwd <dir>] [-h|-v] [--target <window>]` is the sanctioned
+way to add a pane to a live window — no raw `tmux split-window` needed. It only
+creates the pane and prints its id; label it with `name` and start work with
+`type`/`keys`.
 
 ### Parallel Review
 
