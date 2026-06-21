@@ -3,7 +3,7 @@
 # Any tool that can run bash can use this to talk to other panes.
 set -euo pipefail
 
-VERSION="1.13.1"
+VERSION="1.14.0"
 
 # --- Helpers ---
 
@@ -382,6 +382,8 @@ Commands:
   kill <target>             Kill a pane (requires a prior read; respects pause)
   name <target> <label>     Label a pane (visible in tmux border)
   resolve <label>           Print pane target for a label
+  split [--cwd <dir>] [-h|-v] [--target <window>]
+                            Create a pane in the current window; prints its pane-id
   id                        Print this pane's ID ($TMUX_PANE)
   pause [reason]            Block all cross-pane sends (kill switch)
   resume                    Unblock sends
@@ -1073,6 +1075,45 @@ cmd_name() {
   tmx set-option -p -t "$target" @name "$2"
 }
 
+cmd_split() {
+  require_tmux
+  local cwd="" direction="-h" target=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --cwd)
+        shift
+        [[ $# -gt 0 ]] || die "split --cwd requires a directory"
+        cwd="$1"
+        ;;
+      -h) direction="-h" ;;
+      -v) direction="-v" ;;
+      --target)
+        shift
+        [[ $# -gt 0 ]] || die "split --target requires a window"
+        target="$1"
+        ;;
+      *)
+        die "unknown split option: $1. Use: split [--cwd <dir>] [-h|-v] [--target <window>]"
+        ;;
+    esac
+    shift
+  done
+
+  local split_target
+  if [[ -n "$target" ]]; then
+    split_target=$(resolve_target "$target")
+    validate_target "$split_target"
+  else
+    [[ -n "${TMUX_PANE:-}" ]] || die "split requires --target when run outside tmux"
+    split_target="$TMUX_PANE"
+  fi
+
+  local args=("$direction" "-t" "$split_target")
+  [[ -n "$cwd" ]] && args+=("-c" "$cwd")
+  args+=("-PF" '#{pane_id}')
+  tmx split-window "${args[@]}"
+}
+
 cmd_resolve() {
   require_args 1 $# "resolve"
   require_tmux
@@ -1534,7 +1575,7 @@ case "$1" in
   resume)    shift; cmd_resume "$@"; exit ;;
   status)    shift; cmd_status "$@"; exit ;;
   audit)     shift; cmd_audit  "$@"; exit ;;
-  list|type|send|task|message|msg|read|keys|kill|name|resolve|doctor|await) ;;
+  list|type|send|task|message|msg|read|keys|kill|name|resolve|doctor|await|split) ;;
   *)         die "unknown command: $1. Run 'tmux-agent --help' for usage." ;;
 esac
 
@@ -1555,4 +1596,5 @@ case "$1" in
   name)    shift; cmd_name "$@" ;;
   resolve) shift; cmd_resolve "$@" ;;
   doctor)  shift; cmd_doctor "$@" ;;
+  split)   shift; cmd_split "$@" ;;
 esac

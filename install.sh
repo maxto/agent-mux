@@ -2,7 +2,7 @@
 # agent-mux — one-command tmux setup
 set -euo pipefail
 
-VERSION="1.13.1"
+VERSION="1.14.0"
 REPO="maxto/agent-mux"
 BRANCH="v${VERSION}"
 BASE_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
@@ -867,6 +867,8 @@ tmux-agent — cross-pane communication:
   tmux-agent kill <target>                 Kill a pane (requires a prior read; respects pause)
   tmux-agent name <target> <label>         Label a pane (shown in tmux border)
   tmux-agent resolve <label>               Print pane target for a label
+  tmux-agent split [--cwd <dir>] [-h|-v]   Create a pane in the current window; prints pane-id
+    [--target <window>]
   tmux-agent id                            Print this pane's ID ($TMUX_PANE)
   tmux-agent doctor                        Diagnose tmux connectivity and socket issues
 
