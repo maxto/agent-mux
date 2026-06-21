@@ -103,7 +103,7 @@ tmux-agent send implementer "Implement the failing test fix. Report files change
 tmux-agent send reviewer "Review the implementation after the implementer replies."
 ```
 
-`tmux-agent split [--cwd <dir>] [-h|-v] [--target <window>]` is the sanctioned
+`tmux-agent split [--cwd <dir>] [-h|-v] [--target <pane|window>]` is the sanctioned
 way to add a pane to a live window — no raw `tmux split-window` needed. It only
 creates the pane and prints its id; label it with `name` and start work with
 `type`/`keys`.

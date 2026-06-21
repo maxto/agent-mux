@@ -382,7 +382,7 @@ Commands:
   kill <target>             Kill a pane (requires a prior read; respects pause)
   name <target> <label>     Label a pane (visible in tmux border)
   resolve <label>           Print pane target for a label
-  split [--cwd <dir>] [-h|-v] [--target <window>]
+  split [--cwd <dir>] [-h|-v] [--target <pane|window>]
                             Create a pane in the current window; prints its pane-id
   id                        Print this pane's ID ($TMUX_PANE)
   pause [reason]            Block all cross-pane sends (kill switch)
@@ -1089,11 +1089,11 @@ cmd_split() {
       -v) direction="-v" ;;
       --target)
         shift
-        [[ $# -gt 0 ]] || die "split --target requires a window"
+        [[ $# -gt 0 ]] || die "split --target requires a pane or window"
         target="$1"
         ;;
       *)
-        die "unknown split option: $1. Use: split [--cwd <dir>] [-h|-v] [--target <window>]"
+        die "unknown split option: $1. Use: split [--cwd <dir>] [-h|-v] [--target <pane|window>]"
         ;;
     esac
     shift
