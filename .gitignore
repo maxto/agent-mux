@@ -15,3 +15,11 @@ scripts/claude-pane-alert.sh
 .agents/
 .claude/skills/premortem
 skills-lock.json
+
+# Our working files (owner and agents): kept on disk, never committed
+# in this public repo (global rule "Public repositories")
+HANDOFF.md
+LOG.md
+docs/superpowers/
+.superpowers/
+.codex/
